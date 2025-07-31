@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Thermometer, Droplets, Gauge, Zap, Power, Activity } from 'lucide-react';
+import TemperatureHistoryGraph from './TemperatureHistoryGraph';
 
 interface SensorData {
   id: string;
@@ -86,6 +87,61 @@ const Dashboard = () => {
     };
     return colors[status as keyof typeof colors] || colors.offline;
   };
+  
+  const [historicalTemps, setHistoricalTemps] = useState<{ time: Date; value: number }[]>([]);
+
+  // Simulate collecting historical data
+  useEffect(() => {
+    // Initialize with some data
+    const initialData = [];
+    const now = new Date();
+    
+    // Generate data for the last 24 hours
+    for (let i = 24; i >= 0; i--) {
+      const time = new Date(now);
+      time.setHours(now.getHours() - i);
+      
+      // Simulate temperature fluctuations
+      const baseTemp = -18;
+      const fluctuation = Math.sin(i * Math.PI / 12) * 5; // Daily cycle
+      const randomVariation = (Math.random() - 0.5) * 2; // Small random changes
+      
+      initialData.push({
+        time,
+        value: baseTemp + fluctuation + randomVariation
+      });
+    }
+    
+    setHistoricalTemps(initialData);
+
+    // Update with new data periodically
+    const interval = setInterval(() => {
+      setHistoricalTemps(prev => {
+        const newData = [...prev];
+        const now = new Date();
+        
+        // Remove data older than 24 hours
+        while (newData.length > 0 && now.getTime() - newData[0].time.getTime() > 24 * 60 * 60 * 1000) {
+          newData.shift();
+        }
+        
+        // Add new data point
+        const baseTemp = -18;
+        const hours = now.getHours();
+        const fluctuation = Math.sin(hours * Math.PI / 12) * 5;
+        const randomVariation = (Math.random() - 0.5) * 2;
+        
+        newData.push({
+          time: now,
+          value: baseTemp + fluctuation + randomVariation
+        });
+        
+        return newData;
+      });
+    }, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -214,6 +270,22 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         </div>
+         <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Thermometer className="h-5 w-5" />
+              Evaporator Temperature History
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <TemperatureHistoryGraph 
+              temperatures={historicalTemps}
+              minTemp={-30}
+              maxTemp={10}
+              unit="°C"
+            />
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

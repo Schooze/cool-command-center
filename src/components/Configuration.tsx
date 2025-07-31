@@ -7,8 +7,9 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Settings, Snowflake, RotateCcw, Save, Clock, Thermometer, Timer } from 'lucide-react';
+import { Settings, Snowflake, LayoutDashboard, RotateCcw, Save, Clock, Thermometer, Timer } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 import CycleGraph from './CycleGraph';
 
 interface Parameter {
@@ -38,6 +39,7 @@ interface CycleStatus {
 }
 
 const Configuration = () => {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [mode, setMode] = useState<'auto' | 'defrost'>('auto');
   const [autoModeEnabled, setAutoModeEnabled] = useState(true);
@@ -150,7 +152,9 @@ const Configuration = () => {
       description: "All parameters have been reset to factory defaults.",
     });
   };
-
+  const backToDashboard = () => {
+    navigate('/'); // or whatever your dashboard route is
+  }
   const startManualDefrost = () => {
     setDefrostActive(true);
     toast({
@@ -180,6 +184,10 @@ const Configuration = () => {
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-foreground">System Configuration</h1>
           <div className="flex gap-2">
+            <Button onClick={backToDashboard} variant="outline">
+              <LayoutDashboard className="h-4 w-4 mr-2" />
+              Dashboard
+            </Button>
             <Button onClick={resetToDefaults} variant="outline">
               <RotateCcw className="h-4 w-4 mr-2" />
               Reset Defaults
