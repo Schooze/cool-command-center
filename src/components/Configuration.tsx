@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Settings, Snowflake, RotateCcw, Save, Clock, Thermometer, Timer } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import CycleGraph from './CycleGraph';
 
 interface Parameter {
   id: string;
@@ -59,6 +60,10 @@ const Configuration = () => {
     totalCycleTime: 270 // total cycle time (freezing + defrost)
   });
 
+  // Simulate current temperature and time
+  const [currentTemp, setCurrentTemp] = useState(-16.5);
+  const [currentTime, setCurrentTime] = useState(420); // 7:00 AM (420 minutes from 6:00 AM)
+
   const [parameters, setParameters] = useState<Parameter[]>([
     { id: 'f01', code: 'F01', name: 'Temperature setpoint', value: -18.0, unit: '°C', min: -30, max: 10, description: 'Target temperature for the cooling system' },
     { id: 'f02', code: 'F02', name: 'Hysteresis value', value: 2.0, unit: '°C', min: 0.1, max: 10, description: 'Temperature difference for compressor cycling' },
@@ -74,11 +79,25 @@ const Configuration = () => {
     { id: 'f12', code: 'F12', name: 'Door open alarm time', value: 60, unit: 'sec', min: 10, max: 300, description: 'Time before door open alarm triggers' },
   ]);
 
-  // Simulate cycle progress
+  // Simulate cycle progress and temperature
   useEffect(() => {
     if (!autoModeEnabled || !autoModeConfig.cycleEnabled) return;
 
     const interval = setInterval(() => {
+      // Update time (every minute for demo)
+      setCurrentTime(prev => (prev + 1) % 1440); // Reset every 24 hours
+      
+      // Simulate temperature changes based on mode
+      setCurrentTemp(prev => {
+        const targetTemp = cycleStatus.currentMode === 'freezing' 
+          ? autoModeConfig.targetTempFreezing 
+          : autoModeConfig.targetTempDefrost;
+        
+        // Gradually move towards target temperature
+        const diff = targetTemp - prev;
+        return prev + (diff * 0.1) + (Math.random() - 0.5) * 0.5;
+      });
+      
       setCycleStatus(prev => {
         const newTimeRemaining = Math.max(0, prev.timeRemaining - 1);
         
@@ -103,10 +122,10 @@ const Configuration = () => {
           cycleProgress: Math.min(100, progress)
         };
       });
-    }, 60000); // Update every minute for demo (in real system would be actual time)
+    }, 2000); // Update every 2 seconds for demo (in real system would be actual time)
 
     return () => clearInterval(interval);
-  }, [autoModeEnabled, autoModeConfig.cycleEnabled, autoModeConfig.freezingWindowTime, autoModeConfig.defrostWindowTime]);
+  }, [autoModeEnabled, autoModeConfig.cycleEnabled, autoModeConfig.freezingWindowTime, autoModeConfig.defrostWindowTime, autoModeConfig.targetTempFreezing, autoModeConfig.targetTempDefrost, cycleStatus.currentMode]);
 
   const updateParameter = (id: string, value: number) => {
     setParameters(prev => prev.map(param => 
@@ -220,13 +239,24 @@ const Configuration = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-2 mb-6">
                     <div className="flex justify-between text-sm">
                       <span>Cycle Progress</span>
                       <span>{cycleStatus.cycleProgress.toFixed(1)}%</span>
                     </div>
                     <Progress value={cycleStatus.cycleProgress} className="h-2" />
                   </div>
+                  
+                  {/* 24-Hour Cycle Graph */}
+                  <CycleGraph
+                    freezingTime={autoModeConfig.freezingWindowTime}
+                    defrostTime={autoModeConfig.defrostWindowTime}
+                    targetTempFreezing={autoModeConfig.targetTempFreezing}
+                    targetTempDefrost={autoModeConfig.targetTempDefrost}
+                    currentTime={currentTime}
+                    currentTemp={currentTemp}
+                    currentMode={cycleStatus.currentMode}
+                  />
                 </CardContent>
               </Card>
             )}
