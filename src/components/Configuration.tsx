@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Settings, Snowflake, RotateCcw, Save } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Settings, Snowflake, RotateCcw, Save, Clock, Thermometer, Timer } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Parameter {
@@ -20,11 +21,43 @@ interface Parameter {
   description: string;
 }
 
+interface AutoModeConfig {
+  freezingWindowTime: number; // minutes
+  defrostWindowTime: number; // minutes
+  targetTempFreezing: number; // °C
+  targetTempDefrost: number; // °C
+  cycleEnabled: boolean;
+}
+
+interface CycleStatus {
+  currentMode: 'freezing' | 'defrost' | 'idle';
+  timeRemaining: number; // minutes
+  cycleProgress: number; // percentage
+  totalCycleTime: number; // minutes
+}
+
 const Configuration = () => {
   const { toast } = useToast();
   const [mode, setMode] = useState<'auto' | 'defrost'>('auto');
   const [autoModeEnabled, setAutoModeEnabled] = useState(true);
   const [defrostActive, setDefrostActive] = useState(false);
+
+  // Auto mode cycle configuration
+  const [autoModeConfig, setAutoModeConfig] = useState<AutoModeConfig>({
+    freezingWindowTime: 240, // 4 hours
+    defrostWindowTime: 30,   // 30 minutes
+    targetTempFreezing: -18.0,
+    targetTempDefrost: 8.0,
+    cycleEnabled: true
+  });
+
+  // Current cycle status simulation
+  const [cycleStatus, setCycleStatus] = useState<CycleStatus>({
+    currentMode: 'freezing',
+    timeRemaining: 180, // 3 hours remaining in freezing
+    cycleProgress: 25,  // 25% through current cycle
+    totalCycleTime: 270 // total cycle time (freezing + defrost)
+  });
 
   const [parameters, setParameters] = useState<Parameter[]>([
     { id: 'f01', code: 'F01', name: 'Temperature setpoint', value: -18.0, unit: '°C', min: -30, max: 10, description: 'Target temperature for the cooling system' },
@@ -41,10 +74,48 @@ const Configuration = () => {
     { id: 'f12', code: 'F12', name: 'Door open alarm time', value: 60, unit: 'sec', min: 10, max: 300, description: 'Time before door open alarm triggers' },
   ]);
 
+  // Simulate cycle progress
+  useEffect(() => {
+    if (!autoModeEnabled || !autoModeConfig.cycleEnabled) return;
+
+    const interval = setInterval(() => {
+      setCycleStatus(prev => {
+        const newTimeRemaining = Math.max(0, prev.timeRemaining - 1);
+        
+        if (newTimeRemaining === 0) {
+          // Switch modes when time runs out
+          const newMode = prev.currentMode === 'freezing' ? 'defrost' : 'freezing';
+          const newTotalTime = newMode === 'freezing' ? autoModeConfig.freezingWindowTime : autoModeConfig.defrostWindowTime;
+          
+          return {
+            currentMode: newMode,
+            timeRemaining: newTotalTime,
+            cycleProgress: 0,
+            totalCycleTime: newTotalTime
+          };
+        }
+
+        const progress = ((prev.totalCycleTime - newTimeRemaining) / prev.totalCycleTime) * 100;
+        
+        return {
+          ...prev,
+          timeRemaining: newTimeRemaining,
+          cycleProgress: Math.min(100, progress)
+        };
+      });
+    }, 60000); // Update every minute for demo (in real system would be actual time)
+
+    return () => clearInterval(interval);
+  }, [autoModeEnabled, autoModeConfig.cycleEnabled, autoModeConfig.freezingWindowTime, autoModeConfig.defrostWindowTime]);
+
   const updateParameter = (id: string, value: number) => {
     setParameters(prev => prev.map(param => 
       param.id === id ? { ...param, value: Math.max(param.min, Math.min(param.max, value)) } : param
     ));
+  };
+
+  const updateAutoModeConfig = (field: keyof AutoModeConfig, value: number | boolean) => {
+    setAutoModeConfig(prev => ({ ...prev, [field]: value }));
   };
 
   const saveConfiguration = () => {
@@ -78,6 +149,12 @@ const Configuration = () => {
     }, 5000);
   };
 
+  const formatTime = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+  };
+
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="mx-auto max-w-6xl space-y-6">
@@ -108,10 +185,188 @@ const Configuration = () => {
           </TabsList>
 
           <TabsContent value="auto" className="space-y-6">
+            {/* Cycle Status Display */}
+            {autoModeEnabled && autoModeConfig.cycleEnabled && (
+              <Card className="border-primary/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Timer className="h-5 w-5" />
+                    Current Auto Cycle Status
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div className="flex items-center space-x-3">
+                      <div className={`h-4 w-4 rounded-full ${
+                        cycleStatus.currentMode === 'freezing' ? 'bg-info animate-pulse' : 
+                        cycleStatus.currentMode === 'defrost' ? 'bg-warning animate-pulse' : 'bg-muted'
+                      }`}></div>
+                      <div>
+                        <div className="text-sm text-muted-foreground">Current Mode</div>
+                        <div className="font-semibold capitalize">{cycleStatus.currentMode}</div>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-muted-foreground">Time Remaining</div>
+                      <div className="font-semibold">{formatTime(cycleStatus.timeRemaining)}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-muted-foreground">Target Temperature</div>
+                      <div className="font-semibold">
+                        {cycleStatus.currentMode === 'freezing' 
+                          ? `${autoModeConfig.targetTempFreezing}°C` 
+                          : `${autoModeConfig.targetTempDefrost}°C`
+                        }
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Cycle Progress</span>
+                      <span>{cycleStatus.cycleProgress.toFixed(1)}%</span>
+                    </div>
+                    <Progress value={cycleStatus.cycleProgress} className="h-2" />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Auto Mode Cycle Configuration */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
-                  Auto Mode Settings
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-5 w-5" />
+                    Cycle Window Configuration
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Label htmlFor="cycle-enabled">Enable Auto Cycle</Label>
+                    <Switch
+                      id="cycle-enabled"
+                      checked={autoModeConfig.cycleEnabled}
+                      onCheckedChange={(checked) => updateAutoModeConfig('cycleEnabled', checked)}
+                    />
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <Thermometer className="h-4 w-4 text-info" />
+                      Freezing Mode Settings
+                    </h4>
+                    <div className="space-y-2">
+                      <Label htmlFor="freezing-time">Freezing Window Time</Label>
+                      <div className="flex items-center space-x-2">
+                        <Input
+                          id="freezing-time"
+                          type="number"
+                          value={autoModeConfig.freezingWindowTime}
+                          onChange={(e) => updateAutoModeConfig('freezingWindowTime', parseInt(e.target.value) || 0)}
+                          min={30}
+                          max={1440}
+                          className="w-24"
+                        />
+                        <span className="text-sm text-muted-foreground">minutes</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Duration of freezing cycle (30-1440 min)</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="freezing-temp">Target Temperature (Freezing)</Label>
+                      <div className="flex items-center space-x-2">
+                        <Input
+                          id="freezing-temp"
+                          type="number"
+                          value={autoModeConfig.targetTempFreezing}
+                          onChange={(e) => updateAutoModeConfig('targetTempFreezing', parseFloat(e.target.value) || 0)}
+                          step={0.1}
+                          min={-30}
+                          max={0}
+                          className="w-24"
+                        />
+                        <span className="text-sm text-muted-foreground">°C</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Target temperature during freezing mode</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <Snowflake className="h-4 w-4 text-warning" />
+                      Defrost Mode Settings
+                    </h4>
+                    <div className="space-y-2">
+                      <Label htmlFor="defrost-time">Defrost Window Time</Label>
+                      <div className="flex items-center space-x-2">
+                        <Input
+                          id="defrost-time"
+                          type="number"
+                          value={autoModeConfig.defrostWindowTime}
+                          onChange={(e) => updateAutoModeConfig('defrostWindowTime', parseInt(e.target.value) || 0)}
+                          min={5}
+                          max={120}
+                          className="w-24"
+                        />
+                        <span className="text-sm text-muted-foreground">minutes</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Duration of defrost cycle (5-120 min)</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="defrost-temp">Target Temperature (Defrost)</Label>
+                      <div className="flex items-center space-x-2">
+                        <Input
+                          id="defrost-temp"
+                          type="number"
+                          value={autoModeConfig.targetTempDefrost}
+                          onChange={(e) => updateAutoModeConfig('targetTempDefrost', parseFloat(e.target.value) || 0)}
+                          step={0.1}
+                          min={0}
+                          max={20}
+                          className="w-24"
+                        />
+                        <span className="text-sm text-muted-foreground">°C</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Target temperature during defrost mode</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Cycle Summary */}
+                <div className="mt-6 p-4 bg-muted/50 rounded-lg">
+                  <h5 className="font-medium mb-2">Cycle Summary</h5>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Total Cycle Time:</span>
+                      <div className="font-medium">
+                        {formatTime(autoModeConfig.freezingWindowTime + autoModeConfig.defrostWindowTime)}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Freezing Ratio:</span>
+                      <div className="font-medium">
+                        {(autoModeConfig.freezingWindowTime / (autoModeConfig.freezingWindowTime + autoModeConfig.defrostWindowTime) * 100).toFixed(1)}%
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Daily Cycles:</span>
+                      <div className="font-medium">
+                        {(1440 / (autoModeConfig.freezingWindowTime + autoModeConfig.defrostWindowTime)).toFixed(1)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Standard Parameters */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Settings className="h-5 w-5" />
+                    Standard Parameters
+                  </div>
                   <div className="flex items-center space-x-2">
                     <Label htmlFor="auto-mode">Auto Mode</Label>
                     <Switch
