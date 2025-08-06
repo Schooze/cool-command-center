@@ -24,12 +24,6 @@ const AppSidebar: React.FC = () => {
       description: 'Main monitoring dashboard'
     },
     {
-      title: 'Maintenance',
-      icon: MapPin,
-      path: '/maintenance',
-      description: 'Device maintenance and location monitoring'
-    },
-    {
       title: 'Configuration',
       icon: Settings,
       path: '/config',
@@ -40,6 +34,12 @@ const AppSidebar: React.FC = () => {
       icon: Network,
       path: '/things',
       description: 'IoT device management'
+    },
+    {
+      title: 'Maintenance',
+      icon: MapPin,
+      path: '/maintenance',
+      description: 'Device maintenance and location monitoring'
     },
     {
       title: 'Audit & Data Logging',
