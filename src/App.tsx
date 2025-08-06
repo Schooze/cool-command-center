@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import MainLayout from "@/components/MainLayout";
 import Dashboard from "@/components/Dashboard";
+import AuditDataLogging from "@/components/AuditDataLogging";
 import Config from "@/pages/ConfigPage";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,16 @@ const App = () => (
             element={
               <MainLayout>
                 <Dashboard />
+              </MainLayout>
+            } 
+          />
+          
+          {/* Audit & Data Logging Route */}
+          <Route 
+            path="/audit" 
+            element={
+              <MainLayout>
+                <AuditDataLogging />
               </MainLayout>
             } 
           />
