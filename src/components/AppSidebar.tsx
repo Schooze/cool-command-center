@@ -54,7 +54,10 @@ const AppSidebar: React.FC = () => {
   };
 
   return (
-    <Sidebar className="border-r">
+    <Sidebar 
+      className="border-r" 
+      collapsible="icon"
+    >
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
@@ -105,6 +108,7 @@ const AppSidebar: React.FC = () => {
                 <SidebarMenuButton 
                   className="w-full justify-start text-muted-foreground"
                   disabled
+                  tooltip="System Status"
                 >
                   <div className="h-2 w-2 rounded-full bg-status-active mr-2" />
                   <span className="text-sm">System Online</span>
