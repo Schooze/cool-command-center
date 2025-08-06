@@ -27,7 +27,7 @@ const Header: React.FC<HeaderProps> = ({ className }) => {
         {/* Logo */}
         <div className="flex items-center">
           <img
-            src="/koronka_logo_text.png"
+            src="/koronka_text_clear.png"
             alt="Koronka Logo"
             className="h-8 w-auto"
           />
