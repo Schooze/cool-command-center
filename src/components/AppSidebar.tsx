@@ -74,9 +74,20 @@ const AppSidebar: React.FC = () => {
                           : ''
                       }`}
                       tooltip={item.description}
+                      isActive={isActive}
                     >
-                      <Icon className="h-4 w-4" />
-                      <span>{item.title}</span>
+                      <Icon 
+                        className={`h-4 w-4 ${
+                          isActive ? 'text-[#0276af]' : ''
+                        }`} 
+                      />
+                      <span 
+                        className={`${
+                          isActive ? 'text-[#0276af] font-medium' : ''
+                        }`}
+                      >
+                        {item.title}
+                      </span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
