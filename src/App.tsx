@@ -8,6 +8,7 @@ import Dashboard from "@/components/Dashboard";
 import AuditDataLogging from "@/components/AuditDataLogging";
 import Config from "@/pages/ConfigPage";
 import ThingsPage from "@/pages/ThingsPage";
+import MaintenancePage from "@/pages/MaintenancePage";
 
 const queryClient = new QueryClient();
 
@@ -24,6 +25,16 @@ const App = () => (
             element={
               <MainLayout>
                 <Dashboard />
+              </MainLayout>
+            } 
+          />
+          
+          {/* Maintenance Route */}
+          <Route 
+            path="/maintenance" 
+            element={
+              <MainLayout>
+                <MaintenancePage />
               </MainLayout>
             } 
           />
