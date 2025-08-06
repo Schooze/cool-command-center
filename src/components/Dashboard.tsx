@@ -23,14 +23,15 @@ interface DigitalStatus {
 
 const Dashboard = () => {
   const [temperatureSensors, setTemperatureSensors] = useState<SensorData[]>([
-    { id: 'ntc1', name: 'Evaporator Temp', value: -18.5, unit: '°C', status: 'normal', min: -25, max: -15 },
+    { id: 'ntc1', name: 'Product Temp', value: -16.2, unit: '°C', status: 'normal', min: -20, max: -10 },
     { id: 'ntc2', name: 'Product Temp', value: -16.2, unit: '°C', status: 'normal', min: -20, max: -10 },
-    { id: 'ntc3', name: 'Ambient Temp', value: 22.1, unit: '°C', status: 'normal', min: 15, max: 35 },
-    { id: 'ntc4', name: 'Condenser Temp', value: 45.3, unit: '°C', status: 'warning', min: 30, max: 60 },
+    { id: 'ntc3', name: 'Evaporator Temp', value: -18.5, unit: '°C', status: 'normal', min: -25, max: -15 },
+    { id: 'ntc4', name: 'Ambient Temp', value: 22.1, unit: '°C', status: 'normal', min: 15, max: 35 },
+    { id: 'ntc5', name: 'Condenser Temp', value: 45.3, unit: '°C', status: 'warning', min: 30, max: 60 },
   ]);
 
   const [otherSensors, setOtherSensors] = useState<SensorData[]>([
-    { id: 'digital', name: 'Digital Sensor', value: 1, unit: '', status: 'normal' },
+    { id: 'temperature', name: 'Avg Temp', value: 1, unit: '', status: 'normal' },
     { id: 'humidity', name: 'Humidity', value: 65.2, unit: '%', status: 'normal', min: 40, max: 80 },
     { id: 'pressure', name: 'Pressure', value: 1013.2, unit: 'hPa', status: 'normal', min: 950, max: 1050 },
   ]);
@@ -159,7 +160,7 @@ const Dashboard = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Thermometer className="h-5 w-5" />
-              Temperature Sensors (NTC)
+              Temperature Sensors
             </CardTitle>
           </CardHeader>
           <CardContent>
