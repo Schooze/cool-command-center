@@ -7,6 +7,7 @@ import MainLayout from "@/components/MainLayout";
 import Dashboard from "@/components/Dashboard";
 import AuditDataLogging from "@/components/AuditDataLogging";
 import Config from "@/pages/ConfigPage";
+import ThingsPage from "@/pages/ThingsPage";
 
 const queryClient = new QueryClient();
 
@@ -23,6 +24,16 @@ const App = () => (
             element={
               <MainLayout>
                 <Dashboard />
+              </MainLayout>
+            } 
+          />
+          
+          {/* Things Route */}
+          <Route 
+            path="/things" 
+            element={
+              <MainLayout>
+                <ThingsPage />
               </MainLayout>
             } 
           />

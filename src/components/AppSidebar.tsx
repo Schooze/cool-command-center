@@ -9,7 +9,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { Monitor, Settings, FileText, Home } from 'lucide-react';
+import { Monitor, Settings, FileText, Network } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const AppSidebar: React.FC = () => {
@@ -23,11 +23,18 @@ const AppSidebar: React.FC = () => {
       path: '/',
       description: 'Main monitoring dashboard'
     },
+
     {
       title: 'Configuration',
       icon: Settings,
       path: '/config',
       description: 'System settings and configuration'
+    },
+    {
+      title: 'Things',
+      icon: Network,
+      path: '/things',
+      description: 'IoT device management'
     },
     {
       title: 'Audit & Data Logging',
