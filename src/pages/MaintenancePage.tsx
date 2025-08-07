@@ -252,7 +252,7 @@ const MaintenancePage: React.FC = () => {
               />
 
               {/* Status Legend */}
-              <div className="absolute top-4 left-4 bg-white/95 backdrop-blur-sm rounded-lg p-3 space-y-2 shadow-lg z-[1000]">
+              <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-lg p-3 space-y-2 shadow-lg z-[1000]">
                 <div className="text-sm font-medium">Status Legend</div>
                 <div className="flex items-center gap-2 text-xs">
                   <div className="w-3 h-3 rounded-full bg-green-500"></div>
