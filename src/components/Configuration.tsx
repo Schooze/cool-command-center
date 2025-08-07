@@ -44,6 +44,8 @@ const Configuration = () => {
   const [mode, setMode] = useState<'auto' | 'defrost'>('auto');
   const [autoModeEnabled, setAutoModeEnabled] = useState(true);
   const [defrostActive, setDefrostActive] = useState(false);
+  const [freezeActive, setFreezeActive] = useState(false);
+
 
   // Auto mode cycle configuration
   const [autoModeConfig, setAutoModeConfig] = useState<AutoModeConfig>({
@@ -168,6 +170,22 @@ const Configuration = () => {
       });
     }, 5000);
   };
+  const startManualFreezing = () => {
+    setFreezeActive(true);
+    toast({
+      title: "Manual Freezing Started",
+      description: "Freezing cycle has been initiated manually.",
+    });
+
+    // Simulate freezing completion after 5 seconds for demo
+    setTimeout(() => {
+      setFreezeActive(false);
+      toast({
+        title: "Freezing Completed",
+        description: "Manual freezing cycle has finished.",
+      });
+    }, 5000);
+  };
 
   const formatTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -200,10 +218,11 @@ const Configuration = () => {
             </TabsTrigger>
             <TabsTrigger value="defrost" className="flex items-center gap-2">
               <Snowflake className="h-4 w-4" />
-              Defrost Mode Configuration
+              Manual Mode Configuration
             </TabsTrigger>
           </TabsList>
 
+          {/* Auto Mode Configuration */}
           <TabsContent value="auto" className="space-y-6">
             {/* Cycle Status Display */}
             {autoModeEnabled && autoModeConfig.cycleEnabled && (
@@ -390,6 +409,10 @@ const Configuration = () => {
               </CardContent>
             </Card>
 
+          </TabsContent>
+
+          {/* Manual Mode Configuration */}
+          <TabsContent value="defrost" className="space-y-6">
             {/* Standard Parameters */}
             <Card>
               <CardHeader>
@@ -398,7 +421,24 @@ const Configuration = () => {
                     <Settings className="h-5 w-5" />
                     Standard Parameters
                   </div>
+
                   <div className="flex items-center space-x-2">
+                    <Button 
+                      onClick={startManualFreezing}
+                      disabled={freezeActive}
+                      variant={freezeActive ? "secondary" : "default"}
+                    >
+                      <Snowflake className="h-4 w-4 mr-2" />
+                      {freezeActive ? "Freezing Active..." : "Start Manual Freezing"}
+                    </Button>
+                    {freezeActive && (
+                      <Badge variant="secondary" className="animate-pulse">
+                        Freezing
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* <div className="flex items-center space-x-2">
                     <Label htmlFor="auto-mode">Auto Mode</Label>
                     <Switch
                       id="auto-mode"
@@ -408,7 +448,8 @@ const Configuration = () => {
                     <Badge variant={autoModeEnabled ? "default" : "secondary"}>
                       {autoModeEnabled ? "Enabled" : "Disabled"}
                     </Badge>
-                  </div>
+                  </div> */}
+                  
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -438,9 +479,7 @@ const Configuration = () => {
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
-
-          <TabsContent value="defrost" className="space-y-6">
+            {/* Defrost Configuration */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
