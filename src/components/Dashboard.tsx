@@ -146,7 +146,7 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background p-6">
-      <div className="mx-auto max-w-7xl space-y-6">
+      <div className="mx-auto max-w-8xl space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-foreground">Cooling Room Controller</h1>
           <div className="flex items-center space-x-2">
