@@ -1,292 +1,405 @@
-import { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Thermometer, Droplets, Gauge, Zap, Power, Activity } from 'lucide-react';
-import TemperatureHistoryGraph from './TemperatureHistoryGraph';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Checkbox } from '@/components/ui/checkbox';
+import { 
+  Plus, 
+  Thermometer, 
+  Droplets, 
+  Power, 
+  Activity, 
+  Gauge, 
+  Table,
+  Edit,
+  FileText,
+  Wifi,
+  WifiOff,
+  MoreVertical,
+  Maximize2
+} from 'lucide-react';
 
-interface SensorData {
+// Types
+interface Widget {
   id: string;
-  name: string;
-  value: number;
-  unit: string;
-  status: 'normal' | 'warning' | 'alarm' | 'offline';
-  min?: number;
-  max?: number;
+  deviceId: string;
+  type: 'switch' | 'slider' | 'label' | 'status' | 'table';
+  title: string;
+  sensors: string[];
+  value?: number | boolean | string;
+  gridPosition: { row: number; col: number; width: number; height: number };
+  online?: boolean;
 }
 
-interface DigitalStatus {
+interface MockDevice {
   id: string;
   name: string;
-  active: boolean;
-  type: 'input' | 'output';
+  online: boolean;
+  sensors: string[];
+  data: { [key: string]: number | boolean };
 }
 
 const Dashboard = () => {
-  const [temperatureSensors, setTemperatureSensors] = useState<SensorData[]>([
-    { id: 'ntc1', name: 'Product Temp', value: -16.2, unit: '°C', status: 'normal', min: -20, max: -10 },
-    { id: 'ntc2', name: 'Product Temp', value: -16.2, unit: '°C', status: 'normal', min: -20, max: -10 },
-    { id: 'ntc3', name: 'Evaporator Temp', value: -18.5, unit: '°C', status: 'normal', min: -25, max: -15 },
-    { id: 'ntc4', name: 'Ambient Temp', value: 22.1, unit: '°C', status: 'normal', min: 15, max: 35 },
-    { id: 'ntc5', name: 'Condenser Temp', value: 45.3, unit: '°C', status: 'warning', min: 30, max: 60 },
-  ]);
-
-  const [otherSensors, setOtherSensors] = useState<SensorData[]>([
-    { id: 'temperature', name: 'Avg Temp', value: 1, unit: '', status: 'normal' },
-    { id: 'humidity', name: 'Humidity', value: 65.2, unit: '%', status: 'normal', min: 40, max: 80 },
-    { id: 'pressure', name: 'Pressure', value: 1013.2, unit: 'hPa', status: 'normal', min: 950, max: 1050 },
-  ]);
-
-  const [electrical, setElectrical] = useState<SensorData[]>([
-    { id: 'current', name: 'Current', value: 8.5, unit: 'A', status: 'normal', min: 0, max: 15 },
-    { id: 'voltage', name: 'Voltage', value: 230.2, unit: 'V', status: 'normal', min: 200, max: 250 },
-  ]);
-
-  const [digitalInputs, setDigitalInputs] = useState<DigitalStatus[]>([
-    { id: 'di1', name: 'Door Switch', active: false, type: 'input' },
-    { id: 'di2', name: 'Emergency Stop', active: false, type: 'input' },
-    { id: 'di3', name: 'High Pressure', active: false, type: 'input' },
-  ]);
-
-  const [digitalOutputs, setDigitalOutputs] = useState<DigitalStatus[]>([
-    { id: 'do1', name: 'Compressor', active: true, type: 'output' },
-    { id: 'do2', name: 'Fan 1', active: true, type: 'output' },
-    { id: 'do3', name: 'Fan 2', active: false, type: 'output' },
-    { id: 'do4', name: 'Defrost Heater', active: false, type: 'output' },
-    { id: 'do5', name: 'Alarm', active: false, type: 'output' },
-  ]);
-
-  // Simulate real-time updates
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTemperatureSensors(prev => prev.map(sensor => ({
-        ...sensor,
-        value: sensor.value + (Math.random() - 0.5) * 0.2,
-        status: sensor.value > (sensor.max || 100) || sensor.value < (sensor.min || -100) ? 'alarm' : 
-               Math.abs(sensor.value - ((sensor.max || 0) + (sensor.min || 0)) / 2) > ((sensor.max || 0) - (sensor.min || 0)) * 0.3 ? 'warning' : 'normal'
-      })));
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'normal': return 'bg-sensor-normal';
-      case 'warning': return 'bg-sensor-warning';
-      case 'alarm': return 'bg-sensor-alarm';
-      case 'offline': return 'bg-sensor-offline';
-      default: return 'bg-muted';
+  const [widgets, setWidgets] = useState<Widget[]>([
+    {
+      id: 'w1',
+      deviceId: 'device-001',
+      type: 'label',
+      title: 'Temperature Sensor',
+      sensors: ['temperature'],
+      value: -16.2,
+      gridPosition: { row: 1, col: 1, width: 2, height: 2 },
+      online: true
+    },
+    {
+      id: 'w2',
+      deviceId: 'device-001',
+      type: 'switch',
+      title: 'Compressor Control',
+      sensors: ['compressor'],
+      value: true,
+      gridPosition: { row: 1, col: 3, width: 2, height: 2 },
+      online: true
+    },
+    {
+      id: 'w3',
+      deviceId: 'device-002',
+      type: 'status',
+      title: 'System Status',
+      sensors: [],
+      gridPosition: { row: 3, col: 1, width: 3, height: 2 },
+      online: false
     }
-  };
+  ]);
 
-  const getStatusBadge = (status: string) => {
-    const colors = {
-      normal: 'bg-success text-success-foreground',
-      warning: 'bg-warning text-warning-foreground',
-      alarm: 'bg-critical text-critical-foreground',
-      offline: 'bg-muted text-muted-foreground'
-    };
-    return colors[status as keyof typeof colors] || colors.offline;
-  };
-  
-  const [historicalTemps, setHistoricalTemps] = useState<{ time: Date; value: number }[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    deviceId: '',
+    selectedSensors: [] as string[],
+    widgetType: 'label' as Widget['type']
+  });
 
-  // Simulate collecting historical data
-  useEffect(() => {
-    // Initialize with some data
-    const initialData = [];
-    const now = new Date();
-    
-    // Generate data for the last 24 hours
-    for (let i = 24; i >= 0; i--) {
-      const time = new Date(now);
-      time.setHours(now.getHours() - i);
-      
-      // Simulate temperature fluctuations
-      const baseTemp = -18;
-      const fluctuation = Math.sin(i * Math.PI / 12) * 5; // Daily cycle
-      const randomVariation = (Math.random() - 0.5) * 2; // Small random changes
-      
-      initialData.push({
-        time,
-        value: baseTemp + fluctuation + randomVariation
-      });
+  // Mock data for available devices and sensors
+  const mockDevices: MockDevice[] = [
+    {
+      id: 'device-001',
+      name: 'Freezer Unit A',
+      online: true,
+      sensors: ['temperature', 'humidity', 'compressor', 'fan'],
+      data: { temperature: -16.2, humidity: 65, compressor: true, fan: true }
+    },
+    {
+      id: 'device-002',
+      name: 'Cooling Unit B',
+      online: false,
+      sensors: ['temperature', 'pressure', 'valve'],
+      data: { temperature: 0, pressure: 0, valve: false }
     }
-    
-    setHistoricalTemps(initialData);
+  ];
 
-    // Update with new data periodically
-    const interval = setInterval(() => {
-      setHistoricalTemps(prev => {
-        const newData = [...prev];
-        const now = new Date();
-        
-        // Remove data older than 24 hours
-        while (newData.length > 0 && now.getTime() - newData[0].time.getTime() > 24 * 60 * 60 * 1000) {
-          newData.shift();
-        }
-        
-        // Add new data point
-        const baseTemp = -18;
-        const hours = now.getHours();
-        const fluctuation = Math.sin(hours * Math.PI / 12) * 5;
-        const randomVariation = (Math.random() - 0.5) * 2;
-        
-        newData.push({
-          time: now,
-          value: baseTemp + fluctuation + randomVariation
+  const availableSensors = [
+    'temperature', 'humidity', 'pressure', 'compressor', 
+    'fan', 'valve', 'alarm', 'defrost'
+  ];
+
+  const widgetTypes = [
+    { value: 'switch', label: 'Switch (Toggle)', icon: Power },
+    { value: 'slider', label: 'Slider', icon: Gauge },
+    { value: 'label', label: 'Label (Numeric)', icon: Activity },
+    { value: 'status', label: 'Device Status', icon: Wifi },
+    { value: 'table', label: 'Device Table', icon: Table }
+  ];
+
+  // Generate 12-column grid (12x8 = 96 cells)
+  const generateGridCells = () => {
+    const cells = [];
+    for (let row = 1; row <= 8; row++) {
+      for (let col = 1; col <= 12; col++) {
+        const occupied = widgets.some(widget => {
+          const w = widget.gridPosition;
+          return col >= w.col && col < w.col + w.width &&
+                 row >= w.row && row < w.row + w.height;
         });
         
-        return newData;
-      });
-    }, 60000); // Update every minute
+        cells.push(
+          <div
+            key={`${row}-${col}`}
+            className={`
+              h-20 border border-gray-200 rounded-lg
+              ${occupied ? 'bg-transparent border-transparent' : 'bg-gray-50 hover:bg-gray-100'}
+              transition-colors duration-200
+            `}
+            style={{
+              gridColumn: col,
+              gridRow: row
+            }}
+          />
+        );
+      }
+    }
+    return cells;
+  };
 
-    return () => clearInterval(interval);
-  }, []);
+  const handleAddWidget = () => {
+    if (!formData.deviceId || formData.selectedSensors.length === 0) return;
+
+    const newWidget: Widget = {
+      id: `w${Date.now()}`,
+      deviceId: formData.deviceId,
+      type: formData.widgetType,
+      title: `${formData.widgetType.charAt(0).toUpperCase() + formData.widgetType.slice(1)} Widget`,
+      sensors: formData.selectedSensors,
+      gridPosition: { row: 1, col: 1, width: 2, height: 2 },
+      online: mockDevices.find(d => d.id === formData.deviceId)?.online || false
+    };
+
+    setWidgets([...widgets, newWidget]);
+    setIsModalOpen(false);
+    setFormData({ deviceId: '', selectedSensors: [], widgetType: 'label' });
+  };
+
+  const renderWidget = (widget: Widget) => {
+    const device = mockDevices.find(d => d.id === widget.deviceId);
+    const IconComponent = widgetTypes.find(t => t.value === widget.type)?.icon || Activity;
+
+    return (
+      <Card
+        key={widget.id}
+        className="bg-white shadow-lg rounded-2xl border-0 overflow-hidden transition-all duration-300 hover:shadow-xl"
+        style={{
+          gridColumn: `${widget.gridPosition.col} / span ${widget.gridPosition.width}`,
+          gridRow: `${widget.gridPosition.row} / span ${widget.gridPosition.height}`
+        }}
+      >
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <IconComponent className="h-4 w-4 text-blue-600" />
+              <CardTitle className="text-sm font-medium">{widget.title}</CardTitle>
+            </div>
+            <div className="flex items-center gap-1">
+              <Badge 
+                variant="outline" 
+                className={`text-xs ${widget.online ? 'text-green-600 border-green-600' : 'text-red-600 border-red-600'}`}
+              >
+                {widget.online ? <Wifi className="h-3 w-3 mr-1" /> : <WifiOff className="h-3 w-3 mr-1" />}
+                {widget.online ? 'Online' : 'Offline'}
+              </Badge>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="space-y-2">
+            {widget.type === 'label' && (
+              <div className="text-center">
+                <div className="text-2xl font-bold text-gray-900">
+                  {device?.data[widget.sensors[0]] || 0}
+                  {widget.sensors[0] === 'temperature' ? '°C' : 
+                   widget.sensors[0] === 'humidity' ? '%' : 
+                   widget.sensors[0] === 'pressure' ? 'bar' : ''}
+                </div>
+                <div className="text-xs text-gray-500">{widget.sensors[0]}</div>
+              </div>
+            )}
+            
+            {widget.type === 'switch' && (
+              <div className="text-center">
+                <div className={`
+                  inline-block w-12 h-6 rounded-full transition-colors duration-200
+                  ${device?.data[widget.sensors[0]] ? 'bg-blue-600' : 'bg-gray-300'}
+                `}>
+                  <div className={`
+                    w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200 transform mt-0.5
+                    ${device?.data[widget.sensors[0]] ? 'translate-x-6' : 'translate-x-0.5'}
+                  `} />
+                </div>
+                <div className="text-xs text-gray-500 mt-1">{widget.sensors[0]}</div>
+              </div>
+            )}
+            
+            {widget.type === 'status' && (
+              <div className="space-y-2">
+                <div className="text-xs text-gray-600">Device: {device?.name}</div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  {device?.sensors.map(sensor => (
+                    <div key={sensor} className="flex justify-between">
+                      <span>{sensor}:</span>
+                      <span className={widget.online ? 'text-green-600' : 'text-red-600'}>
+                        {widget.online ? 'OK' : 'Error'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {widget.type === 'slider' && (
+              <div className="space-y-2">
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${((device?.data[widget.sensors[0]] as number || 0) + 20) * 2.5}%` }}
+                  />
+                </div>
+                <div className="text-center text-sm font-medium">
+                  {device?.data[widget.sensors[0]] || 0}°C
+                </div>
+              </div>
+            )}
+            
+            {widget.type === 'table' && (
+              <div className="space-y-1 text-xs">
+                {Object.entries(device?.data || {}).slice(0, 3).map(([key, value]) => (
+                  <div key={key} className="flex justify-between">
+                    <span className="text-gray-600">{key}:</span>
+                    <span className="font-medium">
+                      {typeof value === 'boolean' ? (value ? 'ON' : 'OFF') : value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          
+        </CardContent>
+        
+        {/* Widget Resize Handle - Outside of CardContent */}
+        <div className="absolute bottom-2 right-2 text-gray-400 hover:text-gray-600 cursor-se-resize transition-colors duration-200">
+          <Maximize2 className="h-4 w-4 rotate-90" />
+        </div>
+      </Card>
+    );
+  };
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="mx-auto max-w-8xl space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-foreground">Cooling Room Controller</h1>
-          <div className="flex items-center space-x-2">
-            <div className="h-3 w-3 rounded-full bg-success animate-pulse"></div>
-            <span className="text-sm text-muted-foreground">System Online</span>
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">New Dashboard</h1>
+          <p className="text-gray-600">Build your IoT control interface</p>
+        </div>
+
+        {/* 12-Column Grid Canvas */}
+        <div className="relative mb-8">
+          <div 
+            className="grid gap-3 p-6 bg-white rounded-2xl shadow-sm border"
+            style={{ 
+              gridTemplateColumns: 'repeat(12, 1fr)',
+              gridTemplateRows: 'repeat(8, 80px)',
+              minHeight: '720px'
+            }}
+          >
+            {/* Grid cells */}
+            {generateGridCells()}
+            
+            {/* Widgets */}
+            {widgets.map(renderWidget)}
           </div>
         </div>
 
-        {/* Temperature Sensors */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Thermometer className="h-5 w-5" />
-              Temperature Sensors
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {temperatureSensors.map((sensor) => (
-                <div key={sensor.id} className="flex flex-col space-y-2 p-4 border rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">{sensor.name}</span>
-                    <Badge className={getStatusBadge(sensor.status)}>{sensor.status}</Badge>
-                  </div>
-                  <div className="text-2xl font-bold">{sensor.value.toFixed(1)}{sensor.unit}</div>
-                  {sensor.min !== undefined && sensor.max !== undefined && (
-                    <div className="text-xs text-muted-foreground">
-                      Range: {sensor.min}°C to {sensor.max}°C
+        {/* Floating Add Button */}
+        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <DialogTrigger asChild>
+            <Button
+              className="fixed bottom-8 right-8 w-14 h-14 rounded-full shadow-lg bg-blue-600 hover:bg-blue-700 text-white z-10"
+              onClick={() => setIsModalOpen(true)}
+            >
+              <Plus className="h-6 w-6" />
+            </Button>
+          </DialogTrigger>
+          
+          <DialogContent className="max-w-md mx-auto animate-in slide-in-from-top duration-300">
+            <DialogHeader>
+              <DialogTitle>Add New Widget</DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-6 py-4">
+              {/* Device ID Input */}
+              <div className="space-y-2">
+                <Label htmlFor="deviceId">Device ID (UUID)</Label>
+                <Input
+                  id="deviceId"
+                  placeholder="e.g., device-001"
+                  value={formData.deviceId}
+                  onChange={(e) => setFormData({ ...formData, deviceId: e.target.value })}
+                />
+              </div>
+
+              {/* Sensor Selection */}
+              <div className="space-y-3">
+                <Label>Select Sensors</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {availableSensors.map(sensor => (
+                    <div key={sensor} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={sensor}
+                        checked={formData.selectedSensors.includes(sensor)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setFormData({
+                              ...formData,
+                              selectedSensors: [...formData.selectedSensors, sensor]
+                            });
+                          } else {
+                            setFormData({
+                              ...formData,
+                              selectedSensors: formData.selectedSensors.filter(s => s !== sensor)
+                            });
+                          }
+                        }}
+                      />
+                      <label htmlFor={sensor} className="text-sm capitalize">
+                        {sensor}
+                      </label>
                     </div>
-                  )}
+                  ))}
                 </div>
-              ))}
+              </div>
+
+              {/* Widget Type Selection */}
+              <div className="space-y-3">
+                <Label>Widget Type</Label>
+                <RadioGroup 
+                  value={formData.widgetType} 
+                  onValueChange={(value) => setFormData({ ...formData, widgetType: value as Widget['type'] })}
+                >
+                  {widgetTypes.map(type => {
+                    const IconComponent = type.icon;
+                    return (
+                      <div key={type.value} className="flex items-center space-x-2">
+                        <RadioGroupItem value={type.value} id={type.value} />
+                        <label htmlFor={type.value} className="flex items-center space-x-2 text-sm cursor-pointer">
+                          <IconComponent className="h-4 w-4" />
+                          <span>{type.label}</span>
+                        </label>
+                      </div>
+                    );
+                  })}
+                </RadioGroup>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4">
+                <Button onClick={handleAddWidget} className="flex-1">
+                  Add Widget
+                </Button>
+                <Button variant="outline" className="flex-1">
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit Device
+                </Button>
+                <Button variant="outline" className="flex-1">
+                  <FileText className="h-4 w-4 mr-2" />
+                  View Log
+                </Button>
+              </div>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Other Sensors */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="h-5 w-5" />
-                Environmental
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {otherSensors.map((sensor) => (
-                <div key={sensor.id} className="flex items-center justify-between p-3 border rounded">
-                  <div>
-                    <div className="font-medium">{sensor.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {sensor.min !== undefined && sensor.max !== undefined && 
-                        `${sensor.min}-${sensor.max}${sensor.unit}`
-                      }
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-lg font-bold">{sensor.value.toFixed(1)}{sensor.unit}</div>
-                    <Badge className={getStatusBadge(sensor.status)} variant="outline">{sensor.status}</Badge>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Zap className="h-5 w-5" />
-                Electrical
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {electrical.map((sensor) => (
-                <div key={sensor.id} className="flex items-center justify-between p-3 border rounded">
-                  <div>
-                    <div className="font-medium">{sensor.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {sensor.min}-{sensor.max}{sensor.unit}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-lg font-bold">{sensor.value.toFixed(1)}{sensor.unit}</div>
-                    <Badge className={getStatusBadge(sensor.status)} variant="outline">{sensor.status}</Badge>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Power className="h-5 w-5" />
-                System Status
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <h4 className="font-medium mb-2">Digital Inputs</h4>
-                <div className="space-y-2">
-                  {digitalInputs.map((input) => (
-                    <div key={input.id} className="flex items-center justify-between">
-                      <span className="text-sm">{input.name}</span>
-                      <div className={`h-3 w-3 rounded-full ${input.active ? 'bg-status-active' : 'bg-status-inactive'}`}></div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              
-              <div>
-                <h4 className="font-medium mb-2">Digital Outputs</h4>
-                <div className="space-y-2">
-                  {digitalOutputs.map((output) => (
-                    <div key={output.id} className="flex items-center justify-between">
-                      <span className="text-sm">{output.name}</span>
-                      <div className={`h-3 w-3 rounded-full ${output.active ? 'bg-status-active' : 'bg-status-inactive'}`}></div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Thermometer className="h-5 w-5" />
-              Evaporator Temperature History
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <TemperatureHistoryGraph 
-              temperatures={historicalTemps}
-              minTemp={-30}
-              maxTemp={10}
-              unit="°C"
-            />
-          </CardContent>
-        </Card>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
