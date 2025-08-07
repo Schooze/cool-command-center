@@ -1,14 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Network, Edit2, Trash2, Plus, Package, Check, X, QrCode, Camera, CameraOff, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Network, Edit2, Trash2, Plus, Package, Check, X, QrCode } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-
-// Dynamic import for Html5QrcodeScanner
-let Html5QrcodeScanner: any = null;
+import QRScannerModal from '@/components/QRScannerModal';
 
 // Type definitions
 interface IoTDevice {
@@ -22,10 +19,6 @@ interface IoTDevice {
 
 const ThingsPage: React.FC = () => {
   const { toast } = useToast();
-  const qrScannerRef = useRef<any>(null);
-  const [isLibraryLoaded, setIsLibraryLoaded] = useState(false);
-  const [libraryError, setLibraryError] = useState<string>('');
-  const [loadingLibrary, setLoadingLibrary] = useState(true);
   
   // State management
   const [devices, setDevices] = useState<IoTDevice[]>([
@@ -58,391 +51,126 @@ const ThingsPage: React.FC = () => {
   const [newDeviceId, setNewDeviceId] = useState('');
   const [editingDevice, setEditingDevice] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
-  const [isScanning, setIsScanning] = useState(false);
-  const [scanError, setScanError] = useState<string>('');
-  const [debugInfo, setDebugInfo] = useState<string>('');
+  const [isQRModalOpen, setIsQRModalOpen] = useState(false);
 
-  // Load QR Code library
-  useEffect(() => {
-    const loadQRLibrary = async () => {
-      try {
-        setLoadingLibrary(true);
-        setDebugInfo('Loading QR library...');
-        console.log('Attempting to load html5-qrcode library...');
-        
-        // Try dynamic import
-        const module = await import('html5-qrcode');
-        console.log('Module loaded:', module);
-        
-        Html5QrcodeScanner = module.Html5QrcodeScanner;
-        console.log('Html5QrcodeScanner:', Html5QrcodeScanner);
-        
-        if (!Html5QrcodeScanner) {
-          throw new Error('Html5QrcodeScanner not found in module');
-        }
-        
-        setIsLibraryLoaded(true);
-        setDebugInfo('QR library loaded successfully');
-        console.log('QR Library loaded successfully');
-        
-        toast({
-          title: "QR Scanner Ready",
-          description: "QR Code scanner siap digunakan",
-        });
-        
-      } catch (error: any) {
-        console.error('Failed to load QR library:', error);
-        setLibraryError(`Gagal memuat library QR Code: ${error.message}`);
-        setDebugInfo(`Error: ${error.message}`);
-        
-        toast({
-          title: "Library Error",
-          description: "Install: npm install html5-qrcode",
-          variant: "destructive"
-        });
-      } finally {
-        setLoadingLibrary(false);
-      }
-    };
-
-    loadQRLibrary();
-  }, []);
-
-  // Cleanup scanner when component unmounts
-  useEffect(() => {
-    return () => {
-      if (qrScannerRef.current) {
-        qrScannerRef.current.clear().catch((error: any) => {
-          console.error("Error clearing QR scanner on unmount:", error);
-        });
-      }
-    };
-  }, []);
-
-  // QR Code Scanner Functions
-  const startQRScanner = async () => {
-    console.log('Starting QR Scanner...');
-    console.log('Html5QrcodeScanner available:', !!Html5QrcodeScanner);
-    
-    if (!Html5QrcodeScanner) {
-      const errorMsg = "QR Scanner library tidak tersedia";
-      setScanError(errorMsg);
-      toast({
-        title: "Error",
-        description: errorMsg,
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      setScanError('');
-      setDebugInfo('Starting scanner...');
-      setIsScanning(true);
-      
-      // Wait for DOM to update with the qr-reader element
-      setTimeout(async () => {
-        try {
-          console.log('Waiting for qr-reader element...');
-          
-          // Check if element exists
-          const qrReaderElement = document.getElementById("qr-reader");
-          if (!qrReaderElement) {
-            throw new Error('QR Reader element not found after timeout');
-          }
-          
-          // Clear any existing scanner first
-          qrReaderElement.innerHTML = '';
-          console.log('Cleared existing scanner element');
-
-          const qrCodeSuccessCallback = (decodedText: string, decodedResult: any) => {
-            console.log(`QR Code scanned successfully: ${decodedText}`, decodedResult);
-            setDebugInfo(`Scanned: ${decodedText}`);
-            
-            // Set the scanned QR code as device ID
-            setNewDeviceId(decodedText);
-            
-            // Stop the scanner
-            stopQRScanner();
-            
-            // Show success toast
-            toast({
-              title: "QR Code Berhasil Discan",
-              description: `Device ID: ${decodedText}`,
-            });
-          };
-
-          const qrCodeErrorCallback = (errorMessage: string) => {
-            // Filter out common scanning errors that are not real errors
-            if (errorMessage.includes('NotFoundException') || 
-                errorMessage.includes('No QR code found') ||
-                errorMessage.includes('QR code parse error')) {
-              return; // These are normal when no QR code is visible
-            }
-            
-            console.log(`QR scan error (non-critical): ${errorMessage}`);
-            setDebugInfo(`Scanning... (${errorMessage.substring(0, 30)}...)`);
-          };
-
-          console.log('Creating Html5QrcodeScanner instance...');
-          
-          // Initialize scanner with comprehensive configuration
-          qrScannerRef.current = new Html5QrcodeScanner(
-            "qr-reader",
-            {
-              fps: 10,
-              qrbox: { width: 250, height: 250 },
-              aspectRatio: 1.0,
-              showTorchButtonIfSupported: true,
-              showZoomSliderIfSupported: true,
-              defaultZoomValueIfSupported: 1,
-              rememberLastUsedCamera: true,
-              supportedScanTypes: [0], // Only QR Code
-              useBarCodeDetectorIfSupported: true,
-              experimentalFeatures: {
-                useBarCodeDetectorIfSupported: true
-              }
-            },
-            false // verbose = false
-          );
-
-          console.log('Scanner instance created, calling render...');
-          
-          // Render the scanner
-          await qrScannerRef.current.render(qrCodeSuccessCallback, qrCodeErrorCallback);
-          
-          console.log('Scanner rendered successfully');
-          setDebugInfo('Scanner aktif - arahkan ke QR Code');
-          
-          // Check if video element is created after a delay
-          setTimeout(() => {
-            const videoElement = document.querySelector('#qr-reader video') as HTMLVideoElement;
-            if (videoElement) {
-              console.log('Video element found:', videoElement);
-              setDebugInfo('Kamera aktif - siap scan QR Code');
-            } else {
-              console.log('Video element not found');
-              setScanError('Video element tidak ditemukan - coba refresh halaman');
-            }
-          }, 2000);
-
-        } catch (innerError: any) {
-          console.error('Error in delayed scanner setup:', innerError);
-          setIsScanning(false);
-          const errorMsg = `Gagal memulai scanner: ${innerError.message || innerError}`;
-          setScanError(errorMsg);
-          setDebugInfo(`Error: ${innerError.message}`);
-          
-          toast({
-            title: "Scanner Error",
-            description: errorMsg,
-            variant: "destructive"
-          });
-        }
-      }, 100); // Wait 100ms for DOM to update
-
-    } catch (error: any) {
-      console.error('Error starting QR scanner:', error);
-      setIsScanning(false);
-      const errorMsg = `Gagal memulai scanner: ${error.message || error}`;
-      setScanError(errorMsg);
-      setDebugInfo(`Error: ${error.message}`);
-      
-      toast({
-        title: "Scanner Error",
-        description: errorMsg,
-        variant: "destructive"
-      });
-    }
-  };
-
-  const stopQRScanner = () => {
-    console.log('Stopping QR Scanner...');
-    setDebugInfo('Stopping scanner...');
-    
-    if (qrScannerRef.current) {
-      qrScannerRef.current.clear()
-        .then(() => {
-          console.log('QR Scanner cleared successfully');
-          setIsScanning(false);
-          setScanError('');
-          setDebugInfo('Scanner stopped');
-          qrScannerRef.current = null;
-        })
-        .catch((error: any) => {
-          console.error("Error clearing QR scanner:", error);
-          setIsScanning(false);
-          setScanError('');
-          setDebugInfo('Scanner force stopped');
-          qrScannerRef.current = null;
-        });
-    } else {
-      setIsScanning(false);
-      setScanError('');
-      setDebugInfo('Scanner stopped');
-    }
-  };
-
-  // Manual camera permission check
-  const checkCameraPermission = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      stream.getTracks().forEach(track => track.stop());
-      toast({
-        title: "Camera Access",
-        description: "Kamera dapat diakses dengan normal.",
-      });
-      return true;
-    } catch (error: any) {
-      console.error('Camera permission error:', error);
-      toast({
-        title: "Camera Error",
-        description: `Tidak dapat mengakses kamera: ${error.name}`,
-        variant: "destructive"
-      });
-      return false;
-    }
-  };
-
-  // Debug library status
-  const debugLibraryStatus = () => {
-    console.log('=== QR Library Debug Info ===');
-    console.log('Library loaded:', isLibraryLoaded);
-    console.log('Html5QrcodeScanner:', Html5QrcodeScanner);
-    console.log('Loading library:', loadingLibrary);
-    console.log('Library error:', libraryError);
-    console.log('Is scanning:', isScanning);
-    console.log('Current scanner ref:', qrScannerRef.current);
-    
-    toast({
-      title: "Debug Info",
-      description: `Library: ${isLibraryLoaded ? 'Loaded' : 'Not Loaded'}`,
-    });
-  };
-
-  // Add new device function
+  // Device Management Functions
   const handleAddDevice = () => {
     if (!newDeviceId.trim()) {
       toast({
         title: "Error",
-        description: "Device ID tidak boleh kosong",
+        description: "Please enter a Device ID",
         variant: "destructive"
       });
       return;
     }
 
-    // Check for duplicate ID
-    const isDuplicate = devices.some(device => 
-      device.id.toLowerCase() === newDeviceId.trim().toLowerCase()
-    );
-
-    if (isDuplicate) {
+    // Check if device already exists
+    const existingDevice = devices.find(d => d.id === newDeviceId);
+    if (existingDevice) {
       toast({
-        title: "Error", 
-        description: "Device ID sudah terdaftar. Gunakan ID yang berbeda.",
+        title: "Device Already Exists",
+        description: `Device ${newDeviceId} is already connected`,
         variant: "destructive"
       });
       return;
     }
 
-    // Create new device
     const newDevice: IoTDevice = {
-      id: newDeviceId.trim(),
-      name: `New Device ${newDeviceId}`,
-      type: "Unknown Device",
+      id: newDeviceId,
+      name: `Device ${newDeviceId}`,
+      type: "IoT Device",
       image: "/api/placeholder/80/80",
-      status: 'offline',
+      status: 'online',
       connectedAt: new Date()
     };
 
-    setDevices([...devices, newDevice]);
+    setDevices(prev => [...prev, newDevice]);
     setNewDeviceId('');
     
     toast({
-      title: "Success",
-      description: `Device ${newDeviceId} berhasil ditambahkan`,
+      title: "Device Added",
+      description: `${newDevice.name} has been connected successfully`,
     });
   };
 
-  // Edit device name
-  const startEdit = (device: IoTDevice) => {
+  const handleDeleteDevice = (deviceId: string) => {
+    setDevices(prev => prev.filter(d => d.id !== deviceId));
+    
+    toast({
+      title: "Device Removed",
+      description: `Device ${deviceId} has been disconnected`,
+    });
+  };
+
+  const handleStartEdit = (device: IoTDevice) => {
     setEditingDevice(device.id);
     setEditName(device.name);
   };
 
-  const saveEdit = () => {
-    if (!editName.trim()) {
-      toast({
-        title: "Error",
-        description: "Nama device tidak boleh kosong",
-        variant: "destructive"
-      });
-      return;
-    }
+  const handleSaveEdit = (deviceId: string) => {
+    if (!editName.trim()) return;
 
-    setDevices(devices.map(device => 
-      device.id === editingDevice 
-        ? { ...device, name: editName.trim() }
-        : device
+    setDevices(prev => prev.map(d => 
+      d.id === deviceId 
+        ? { ...d, name: editName.trim() }
+        : d
     ));
-    
+
     setEditingDevice(null);
     setEditName('');
     
     toast({
-      title: "Success", 
-      description: "Nama device berhasil diupdate",
+      title: "Device Updated",
+      description: "Device name has been updated successfully",
     });
   };
 
-  const cancelEdit = () => {
+  const handleCancelEdit = () => {
     setEditingDevice(null);
     setEditName('');
   };
 
-  // Delete device
-  const handleDeleteDevice = (deviceId: string) => {
-    setDevices(devices.filter(device => device.id !== deviceId));
+  // QR Scanner Functions
+  const openQRScanner = () => {
+    setIsQRModalOpen(true);
+  };
+
+  const closeQRScanner = () => {
+    setIsQRModalOpen(false);
+  };
+
+  const handleQRScanResult = (scannedText: string) => {
+    console.log('QR Code scanned:', scannedText);
+    
+    // Set the scanned text as the new device ID
+    setNewDeviceId(scannedText);
+    
     toast({
-      title: "Success",
-      description: "Device berhasil dihapus",
+      title: "QR Code Scanned Successfully",
+      description: `Device ID: ${scannedText}`,
     });
   };
 
-  // Handle enter key for adding device
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleAddDevice();
-    }
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('id-ID', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-6 p-6">
+      {/* Page Header */}
       <div className="flex items-center gap-3">
-        <Network className="h-6 w-6 text-primary" />
-        <h1 className="text-2xl font-bold">Things</h1>
-        <Badge variant="outline" className="ml-auto">
-          {devices.length} Connected Devices
-        </Badge>
+        <Network className="h-8 w-8 text-blue-600" />
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">IoT Devices</h1>
+          <p className="text-gray-600">Manage your connected IoT devices</p>
+        </div>
       </div>
 
-      {/* Library Status Alert */}
-      {loadingLibrary && (
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>Loading QR Code library...</AlertDescription>
-        </Alert>
-      )}
-
-      {libraryError && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{libraryError}</AlertDescription>
-        </Alert>
-      )}
-
-      {/* Add Device Section */}
+      {/* Add New Device Section */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -452,98 +180,26 @@ const ThingsPage: React.FC = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {/* Input and Buttons Row */}
             <div className="flex gap-2">
               <Input
                 placeholder="Enter Device ID (e.g., FRZ003)"
                 value={newDeviceId}
                 onChange={(e) => setNewDeviceId(e.target.value)}
-                onKeyPress={handleKeyPress}
+                onKeyPress={(e) => e.key === 'Enter' && handleAddDevice()}
                 className="flex-1"
               />
-              <Button onClick={handleAddDevice} className="px-6">
-                Submit
-              </Button>
               <Button 
-                variant="outline" 
-                onClick={isScanning ? stopQRScanner : startQRScanner}
+                onClick={openQRScanner}
+                variant="outline"
                 className="px-4 flex items-center gap-2"
-                disabled={loadingLibrary || !isLibraryLoaded}
               >
-                {isScanning ? (
-                  <>
-                    <CameraOff className="h-4 w-4" />
-                    Stop
-                  </>
-                ) : (
-                  <>
-                    <QrCode className="h-4 w-4" />
-                    {loadingLibrary ? 'Loading...' : 'Scan QR'}
-                  </>
-                )}
+                <QrCode className="h-4 w-4" />
+                Scan QR
+              </Button>
+              <Button onClick={handleAddDevice}>
+                Add Device
               </Button>
             </div>
-
-            {/* Debug Buttons
-            <div className="flex gap-2">
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={checkCameraPermission}
-                className="text-sm"
-              >
-                Test Camera
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={debugLibraryStatus}
-                className="text-sm"
-              >
-                Debug Library
-              </Button>
-            </div> */}
-
-            {/* Debug Info */}
-            {debugInfo && (
-              <div className="text-sm text-blue-600 bg-blue-50 p-2 rounded border">
-                Debug: {debugInfo}
-              </div>
-            )}
-
-            {/* QR Scanner Container */}
-            {isScanning && (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Camera className="h-4 w-4" />
-                  Arahkan kamera ke QR Code. Pastikan QR Code terlihat jelas dalam kotak.
-                </div>
-                
-                {scanError && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{scanError}</AlertDescription>
-                  </Alert>
-                )}
-                
-                <div 
-                  id="qr-reader" 
-                  className="w-full max-w-md mx-auto border-2 border-dashed border-gray-300 rounded-lg overflow-hidden bg-gray-50"
-                  style={{ minHeight: '400px' }}
-                ></div>
-                
-                <div className="text-center">
-                  <Button 
-                    variant="secondary" 
-                    size="sm" 
-                    onClick={stopQRScanner}
-                    className="mt-2"
-                  >
-                    Batal Scan
-                  </Button>
-                </div>
-              </div>
-            )}
           </div>
         </CardContent>
       </Card>
@@ -553,78 +209,71 @@ const ThingsPage: React.FC = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" />
-            Connected Devices
+            Connected Devices ({devices.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
           {devices.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Network className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Belum ada device yang terhubung</p>
+            <div className="text-center py-8 text-gray-500">
+              <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
+              <p>No devices connected yet</p>
+              <p className="text-sm">Add your first IoT device above</p>
             </div>
           ) : (
             <div className="space-y-4">
               {devices.map((device) => (
-                <div 
-                  key={device.id}
-                  className="flex items-center gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
-                >
-                  {/* Device Image */}
-                  <div className="w-20 h-20 bg-muted rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Package className="h-8 w-8 text-muted-foreground" />
-                  </div>
-
-                  {/* Device Info */}
+                <div key={device.id} className="flex items-center gap-4 p-4 border rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                  <img 
+                    src={device.image} 
+                    alt={device.name}
+                    className="w-16 h-16 rounded-lg object-cover bg-gray-200"
+                  />
+                  
                   <div className="flex-1 min-w-0">
-                    {editingDevice === device.id ? (
-                      <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      {editingDevice === device.id ? (
                         <Input
                           value={editName}
                           onChange={(e) => setEditName(e.target.value)}
-                          className="font-medium"
-                          onKeyPress={(e) => e.key === 'Enter' && saveEdit()}
+                          onKeyPress={(e) => e.key === 'Enter' && handleSaveEdit(device.id)}
+                          className="font-medium text-gray-900 h-8"
+                          autoFocus
                         />
-                        <p className="text-sm text-muted-foreground">{device.type}</p>
-                      </div>
-                    ) : (
-                      <div>
-                        <h3 className="font-medium truncate">{device.name}</h3>
-                        <p className="text-sm text-muted-foreground">{device.type}</p>
-                      </div>
-                    )}
-                    
-                    <div className="flex items-center gap-2 mt-2">
+                      ) : (
+                        <h3 className="font-medium text-gray-900 truncate">
+                          {device.name}
+                        </h3>
+                      )}
+                      
                       <Badge 
                         variant={device.status === 'online' ? 'default' : 'secondary'}
-                        className="text-xs"
+                        className={device.status === 'online' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}
                       >
-                        {device.status === 'online' ? '🟢' : '🔴'} {device.status.toUpperCase()}
+                        {device.status}
                       </Badge>
-                      <span className="text-xs text-muted-foreground">
-                        ID: {device.id}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        Connected: {device.connectedAt.toLocaleDateString()}
-                      </span>
+                    </div>
+                    
+                    <div className="text-sm text-gray-600 space-y-1">
+                      <p>Type: {device.type}</p>
+                      <p>Device ID: {device.id}</p>
+                      <p>Connected: {formatDate(device.connectedAt)}</p>
                     </div>
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="flex items-center gap-2">
                     {editingDevice === device.id ? (
                       <>
                         <Button
+                          variant="ghost"
                           size="sm"
-                          onClick={saveEdit}
-                          className="h-8 w-8 p-0"
+                          onClick={() => handleSaveEdit(device.id)}
                         >
                           <Check className="h-4 w-4" />
                         </Button>
                         <Button
+                          variant="ghost"
                           size="sm"
-                          variant="outline"
-                          onClick={cancelEdit}
-                          className="h-8 w-8 p-0"
+                          onClick={handleCancelEdit}
                         >
                           <X className="h-4 w-4" />
                         </Button>
@@ -632,18 +281,17 @@ const ThingsPage: React.FC = () => {
                     ) : (
                       <>
                         <Button
+                          variant="ghost"
                           size="sm"
-                          variant="outline"
-                          onClick={() => startEdit(device)}
-                          className="h-8 w-8 p-0"
+                          onClick={() => handleStartEdit(device)}
                         >
                           <Edit2 className="h-4 w-4" />
                         </Button>
                         <Button
+                          variant="ghost"
                           size="sm"
-                          variant="destructive"
                           onClick={() => handleDeleteDevice(device.id)}
-                          className="h-8 w-8 p-0"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -656,6 +304,13 @@ const ThingsPage: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* QR Scanner Modal */}
+      <QRScannerModal
+        isOpen={isQRModalOpen}
+        onClose={closeQRScanner}
+        onScan={handleQRScanResult}
+      />
     </div>
   );
 };
