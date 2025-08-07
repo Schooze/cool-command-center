@@ -53,83 +53,6 @@ const ThingsPage: React.FC = () => {
   const [editName, setEditName] = useState('');
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
 
-  // Device Management Functions
-  const handleAddDevice = () => {
-    if (!newDeviceId.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a Device ID",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Check if device already exists
-    const existingDevice = devices.find(d => d.id === newDeviceId);
-    if (existingDevice) {
-      toast({
-        title: "Device Already Exists",
-        description: `Device ${newDeviceId} is already connected`,
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const newDevice: IoTDevice = {
-      id: newDeviceId,
-      name: `Device ${newDeviceId}`,
-      type: "IoT Device",
-      image: "/api/placeholder/80/80",
-      status: 'online',
-      connectedAt: new Date()
-    };
-
-    setDevices(prev => [...prev, newDevice]);
-    setNewDeviceId('');
-    
-    toast({
-      title: "Device Added",
-      description: `${newDevice.name} has been connected successfully`,
-    });
-  };
-
-  const handleDeleteDevice = (deviceId: string) => {
-    setDevices(prev => prev.filter(d => d.id !== deviceId));
-    
-    toast({
-      title: "Device Removed",
-      description: `Device ${deviceId} has been disconnected`,
-    });
-  };
-
-  const handleStartEdit = (device: IoTDevice) => {
-    setEditingDevice(device.id);
-    setEditName(device.name);
-  };
-
-  const handleSaveEdit = (deviceId: string) => {
-    if (!editName.trim()) return;
-
-    setDevices(prev => prev.map(d => 
-      d.id === deviceId 
-        ? { ...d, name: editName.trim() }
-        : d
-    ));
-
-    setEditingDevice(null);
-    setEditName('');
-    
-    toast({
-      title: "Device Updated",
-      description: "Device name has been updated successfully",
-    });
-  };
-
-  const handleCancelEdit = () => {
-    setEditingDevice(null);
-    setEditName('');
-  };
-
   // QR Scanner Functions
   const openQRScanner = () => {
     setIsQRModalOpen(true);
@@ -141,36 +64,117 @@ const ThingsPage: React.FC = () => {
 
   const handleQRScanResult = (scannedText: string) => {
     console.log('QR Code scanned:', scannedText);
-    
-    // Set the scanned text as the new device ID
     setNewDeviceId(scannedText);
+  };
+
+  // Add new device function
+  const handleAddDevice = () => {
+    if (!newDeviceId.trim()) {
+      toast({
+        title: "Error",
+        description: "Device ID tidak boleh kosong",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Check for duplicate ID
+    const isDuplicate = devices.some(device => 
+      device.id.toLowerCase() === newDeviceId.trim().toLowerCase()
+    );
+
+    if (isDuplicate) {
+      toast({
+        title: "Error", 
+        description: "Device ID sudah terdaftar. Gunakan ID yang berbeda.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Create new device
+    const newDevice: IoTDevice = {
+      id: newDeviceId.trim(),
+      name: `New Device ${newDeviceId}`,
+      type: "Unknown Device",
+      image: "/api/placeholder/80/80",
+      status: 'offline',
+      connectedAt: new Date()
+    };
+
+    setDevices([...devices, newDevice]);
+    setNewDeviceId('');
     
     toast({
-      title: "QR Code Scanned Successfully",
-      description: `Device ID: ${scannedText}`,
+      title: "Success",
+      description: `Device ${newDeviceId} berhasil ditambahkan`,
     });
   };
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('id-ID', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
+  // Edit device name
+  const startEdit = (device: IoTDevice) => {
+    setEditingDevice(device.id);
+    setEditName(device.name);
+  };
+
+  const saveEdit = () => {
+    if (!editName.trim()) {
+      toast({
+        title: "Error",
+        description: "Nama device tidak boleh kosong",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setDevices(devices.map(device => 
+      device.id === editingDevice 
+        ? { ...device, name: editName.trim() }
+        : device
+    ));
+    
+    setEditingDevice(null);
+    setEditName('');
+    
+    toast({
+      title: "Success", 
+      description: "Nama device berhasil diupdate",
     });
+  };
+
+  const cancelEdit = () => {
+    setEditingDevice(null);
+    setEditName('');
+  };
+
+  // Delete device
+  const handleDeleteDevice = (deviceId: string) => {
+    setDevices(devices.filter(device => device.id !== deviceId));
+    toast({
+      title: "Success",
+      description: "Device berhasil dihapus",
+    });
+  };
+
+  // Handle enter key for adding device
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleAddDevice();
+    }
   };
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Page Header */}
+    <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center gap-3">
-        <Network className="h-8 w-8 text-blue-600" />
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">IoT Devices</h1>
-          <p className="text-gray-600">Manage your connected IoT devices</p>
-        </div>
+        <Network className="h-6 w-6 text-primary" />
+        <h1 className="text-2xl font-bold">Things</h1>
+        <Badge variant="outline" className="ml-auto">
+          {devices.length} Connected Devices
+        </Badge>
       </div>
 
-      {/* Add New Device Section */}
+      {/* Add Device Section */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -179,27 +183,25 @@ const ThingsPage: React.FC = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <div className="flex gap-2">
-              <Input
-                placeholder="Enter Device ID (e.g., FRZ003)"
-                value={newDeviceId}
-                onChange={(e) => setNewDeviceId(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleAddDevice()}
-                className="flex-1"
-              />
-              <Button 
-                onClick={openQRScanner}
-                variant="outline"
-                className="px-4 flex items-center gap-2"
-              >
-                <QrCode className="h-4 w-4" />
-                Scan QR
-              </Button>
-              <Button onClick={handleAddDevice}>
-                Add Device
-              </Button>
-            </div>
+          <div className="flex gap-2">
+            <Input
+              placeholder="Enter Device ID (e.g., FRZ003)"
+              value={newDeviceId}
+              onChange={(e) => setNewDeviceId(e.target.value)}
+              onKeyPress={handleKeyPress}
+              className="flex-1"
+            />
+            {/* <Button 
+              onClick={openQRScanner}
+              variant="outline"
+              className="px-4 flex items-center gap-2"
+            >
+              <QrCode className="h-4 w-4" />
+              Scan QR
+            </Button> */}
+            <Button onClick={handleAddDevice} className="px-6">
+              Submit
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -209,71 +211,78 @@ const ThingsPage: React.FC = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" />
-            Connected Devices ({devices.length})
+            Connected Devices
           </CardTitle>
         </CardHeader>
         <CardContent>
           {devices.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
-              <p>No devices connected yet</p>
-              <p className="text-sm">Add your first IoT device above</p>
+            <div className="text-center py-12 text-muted-foreground">
+              <Network className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>Belum ada device yang terhubung</p>
             </div>
           ) : (
             <div className="space-y-4">
               {devices.map((device) => (
-                <div key={device.id} className="flex items-center gap-4 p-4 border rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
-                  <img 
-                    src={device.image} 
-                    alt={device.name}
-                    className="w-16 h-16 rounded-lg object-cover bg-gray-200"
-                  />
-                  
+                <div 
+                  key={device.id}
+                  className="flex items-center gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                >
+                  {/* Device Image */}
+                  <div className="w-20 h-20 bg-muted rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Package className="h-8 w-8 text-muted-foreground" />
+                  </div>
+
+                  {/* Device Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      {editingDevice === device.id ? (
+                    {editingDevice === device.id ? (
+                      <div className="space-y-2">
                         <Input
                           value={editName}
                           onChange={(e) => setEditName(e.target.value)}
-                          onKeyPress={(e) => e.key === 'Enter' && handleSaveEdit(device.id)}
-                          className="font-medium text-gray-900 h-8"
-                          autoFocus
+                          className="font-medium"
+                          onKeyPress={(e) => e.key === 'Enter' && saveEdit()}
                         />
-                      ) : (
-                        <h3 className="font-medium text-gray-900 truncate">
-                          {device.name}
-                        </h3>
-                      )}
-                      
+                        <p className="text-sm text-muted-foreground">{device.type}</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <h3 className="font-medium truncate">{device.name}</h3>
+                        <p className="text-sm text-muted-foreground">{device.type}</p>
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center gap-2 mt-2">
                       <Badge 
                         variant={device.status === 'online' ? 'default' : 'secondary'}
-                        className={device.status === 'online' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}
+                        className="text-xs"
                       >
-                        {device.status}
+                        {device.status === 'online' ? '🟢' : '🔴'} {device.status.toUpperCase()}
                       </Badge>
-                    </div>
-                    
-                    <div className="text-sm text-gray-600 space-y-1">
-                      <p>Type: {device.type}</p>
-                      <p>Device ID: {device.id}</p>
-                      <p>Connected: {formatDate(device.connectedAt)}</p>
+                      <span className="text-xs text-muted-foreground">
+                        ID: {device.id}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        Connected: {device.connectedAt.toLocaleDateString()}
+                      </span>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     {editingDevice === device.id ? (
                       <>
                         <Button
-                          variant="ghost"
                           size="sm"
-                          onClick={() => handleSaveEdit(device.id)}
+                          onClick={saveEdit}
+                          className="h-8 w-8 p-0"
                         >
                           <Check className="h-4 w-4" />
                         </Button>
                         <Button
-                          variant="ghost"
                           size="sm"
-                          onClick={handleCancelEdit}
+                          variant="outline"
+                          onClick={cancelEdit}
+                          className="h-8 w-8 p-0"
                         >
                           <X className="h-4 w-4" />
                         </Button>
@@ -281,17 +290,18 @@ const ThingsPage: React.FC = () => {
                     ) : (
                       <>
                         <Button
-                          variant="ghost"
                           size="sm"
-                          onClick={() => handleStartEdit(device)}
+                          variant="outline"
+                          onClick={() => startEdit(device)}
+                          className="h-8 w-8 p-0"
                         >
                           <Edit2 className="h-4 w-4" />
                         </Button>
                         <Button
-                          variant="ghost"
                           size="sm"
+                          variant="destructive"
                           onClick={() => handleDeleteDevice(device.id)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          className="h-8 w-8 p-0"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -304,6 +314,53 @@ const ThingsPage: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Statistics */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Devices</p>
+                <p className="text-2xl font-bold">{devices.length}</p>
+              </div>
+              <Network className="h-8 w-8 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Online</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {devices.filter(d => d.status === 'online').length}
+                </p>
+              </div>
+              <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
+                <div className="h-4 w-4 rounded-full bg-green-500"></div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Offline</p>
+                <p className="text-2xl font-bold text-red-600">
+                  {devices.filter(d => d.status === 'offline').length}
+                </p>
+              </div>
+              <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
+                <div className="h-4 w-4 rounded-full bg-red-500"></div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* QR Scanner Modal */}
       <QRScannerModal
