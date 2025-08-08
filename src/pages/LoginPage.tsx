@@ -1,4 +1,4 @@
-// File: src/pages/LoginPage.tsx (fixed version)
+// File: src/pages/LoginPage.tsx (FIXED VERSION)
 import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -31,28 +31,55 @@ const LoginPage: React.FC = () => {
     return <Navigate to={from} replace />;
   }
 
-  // 🔧 FIX: Add event parameter and preventDefault
-  const handleSubmit = async (event?: React.FormEvent | React.MouseEvent) => {
-    if (event) {
-      event.preventDefault(); // Prevent default form submission
-      event.stopPropagation(); // Stop event bubbling
-    }
+  // 🔧 FIX 1: Unified form submission handler
+  const handleFormSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); // 🚨 CRITICAL: Prevent browser default form submission
+    event.stopPropagation(); // Stop event bubbling
     
+    // Validate inputs
     if (!username || !password) return;
     
     try {
+      console.log('🔐 Attempting login for:', username);
       await login({ username, password });
     } catch (error) {
-      // Error handled by react-query, no need to do anything
-      console.log('Login error caught and handled by useAuth');
+      // Error is handled by useAuth hook through react-query
+      console.log('Login error handled by useAuth:', error);
     }
   };
 
-  // 🔧 FIX: Handle key press properly
-  const handleKeyDown = (event: React.KeyboardEvent) => {
+  // 🔧 FIX 2: Separate button click handler (for compatibility)
+  const handleButtonClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault(); // Prevent any default behavior
+    
+    // Create a synthetic form event and call the form handler
+    const form = event.currentTarget.closest('form');
+    if (form) {
+      const formEvent = new Event('submit', { cancelable: true, bubbles: true }) as any;
+      formEvent.preventDefault = () => {}; // Mock preventDefault
+      formEvent.stopPropagation = () => {}; // Mock stopPropagation
+      handleFormSubmit({ 
+        preventDefault: () => {}, 
+        stopPropagation: () => {},
+        currentTarget: form 
+      } as any);
+    }
+  };
+
+  // 🔧 FIX 3: Proper keyboard event handling
+  const handleKeyPress = (event: React.KeyboardEvent) => {
     if (event.key === 'Enter') {
-      event.preventDefault(); // Prevent form submission
-      handleSubmit(event);
+      event.preventDefault(); // Prevent default Enter behavior
+      
+      // Find the form and submit it properly
+      const form = event.currentTarget.closest('form');
+      if (form) {
+        handleFormSubmit({ 
+          preventDefault: () => {}, 
+          stopPropagation: () => {},
+          currentTarget: form 
+        } as any);
+      }
     }
   };
 
@@ -62,8 +89,12 @@ const LoginPage: React.FC = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-cyan-50 p-4">
-      {/* 🔧 FIX: Wrap in form with proper onSubmit handling */}
-      <form onSubmit={handleSubmit} className="w-full max-w-md">
+      {/* 🔧 FIX 4: Proper form element with controlled submission */}
+      <form 
+        onSubmit={handleFormSubmit}
+        className="w-full max-w-md"
+        noValidate // Prevent browser validation to control our own
+      >
         <Card className="w-full shadow-2xl border-0">
           <CardHeader className="space-y-4 pb-6">
             <div className="flex justify-center">
@@ -98,14 +129,17 @@ const LoginPage: React.FC = () => {
                   <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
                     id="username"
-                    name="username" // 🔧 ADD: Proper form field name
+                    name="username"
+                    type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
+                    onKeyDown={handleKeyPress} // 🔧 FIX: Proper key handling
                     placeholder="Masukkan username"
                     className="pl-10 h-11"
                     disabled={loginLoading || maxAttemptsReached}
-                    onKeyDown={handleKeyDown} // 🔧 FIX: Use proper key handler
-                    autoComplete="username" // 🔧 ADD: Better UX
+                    autoComplete="username"
+                    autoCapitalize="none"
+                    spellCheck={false}
                   />
                 </div>
               </div>
@@ -116,32 +150,37 @@ const LoginPage: React.FC = () => {
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
                     id="password"
-                    name="password" // 🔧 ADD: Proper form field name
+                    name="password"
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    onKeyDown={handleKeyPress} // 🔧 FIX: Proper key handling
                     placeholder="Masukkan password"
                     className="pl-10 pr-10 h-11"
                     disabled={loginLoading || maxAttemptsReached}
-                    onKeyDown={handleKeyDown} // 🔧 FIX: Use proper key handler
-                    autoComplete="current-password" // 🔧 ADD: Better UX
+                    autoComplete="current-password"
                   />
                   <button
-                    type="button" // 🔧 IMPORTANT: Explicit button type
-                    onClick={() => setShowPassword(!showPassword)}
+                    type="button" // 🚨 CRITICAL: Explicit button type to prevent form submission
+                    onClick={(e) => {
+                      e.preventDefault(); // Prevent any form interaction
+                      setShowPassword(!showPassword);
+                    }}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                     disabled={loginLoading || maxAttemptsReached}
+                    tabIndex={-1} // Remove from tab order
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
               </div>
               
+              {/* 🔧 FIX 5: Proper submit button */}
               <Button
-                type="submit" // 🔧 FIX: Explicit submit type
-                onClick={handleSubmit} // 🔧 KEEP: For click handling
+                type="submit"
+                onClick={handleButtonClick} // Backup click handler
                 className="w-full h-11 bg-blue-600 hover:bg-blue-700"
-                disabled={loginLoading || maxAttemptsReached || !username || !password}
+                disabled={loginLoading || maxAttemptsReached || !username.trim() || !password.trim()}
               >
                 {loginLoading ? (
                   <>
@@ -158,7 +197,7 @@ const LoginPage: React.FC = () => {
               <p className="text-xs text-gray-500">
                 Sistem keamanan aktif. Login attempts: {attempts}/5
               </p>
-              {/* 🔧 ADD: Debug info for development */}
+              {/* Debug info for development */}
               {process.env.NODE_ENV === 'development' && loginError && (
                 <p className="text-xs text-red-500 mt-1">
                   Debug: {loginError.name} - {loginError.message}
