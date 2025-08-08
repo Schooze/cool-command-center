@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -7,10 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Label } from '@/components/ui/label';
-import { Eye, EyeOff, Lock, User, AlertCircle, Loader2, Snowflake } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Eye, EyeOff, Lock, User, AlertCircle, Loader2, Snowflake, Clock, Shield } from 'lucide-react';
 
 const LoginPage: React.FC = () => {
-  const { login, isAuthenticated, loginLoading, loginError } = useAuth();
+  const { login, isAuthenticated, loginLoading, loginError, ipStatus, checkIPStatus } = useAuth();
   const location = useLocation();
   
   const [username, setUsername] = useState('');
@@ -21,11 +21,16 @@ const LoginPage: React.FC = () => {
 
   const from = location.state?.from?.pathname || '/';
 
+  // Check IP status on component mount
+  useEffect(() => {
+    checkIPStatus();
+  }, []);
+
   useEffect(() => {
     if (loginError) {
       setAttempts(prev => prev + 1);
       setPassword(''); // Clear password on error
-      setIsSubmitting(false); // Reset submitting state
+      setIsSubmitting(false);
     }
   }, [loginError]);
 
@@ -34,15 +39,12 @@ const LoginPage: React.FC = () => {
     return <Navigate to={from} replace />;
   }
 
-  // 🔧 MAIN FIX: Single, comprehensive form submission handler
   const handleLogin = async (event?: React.FormEvent | React.MouseEvent) => {
-    // Always prevent default behavior
     if (event) {
       event.preventDefault();
       event.stopPropagation();
     }
     
-    // Validation
     if (!username.trim() || !password.trim()) {
       console.log('❌ Empty username or password');
       return;
@@ -53,6 +55,12 @@ const LoginPage: React.FC = () => {
       return;
     }
     
+    // Check IP status before attempting login
+    if (ipStatus?.is_blocked) {
+      console.log('❌ IP is blocked');
+      return;
+    }
+    
     try {
       setIsSubmitting(true);
       console.log('🔐 Login attempt for:', username);
@@ -60,17 +68,14 @@ const LoginPage: React.FC = () => {
       await login({ username: username.trim(), password });
       
       console.log('✅ Login successful');
-      // Navigation will be handled by the useAuth hook and Navigate component
       
     } catch (error: any) {
       console.error('❌ Login error:', error.message);
-      // Error state is handled by useAuth hook automatically
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Handle Enter key press
   const handleKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === 'Enter') {
       event.preventDefault();
@@ -78,14 +83,25 @@ const LoginPage: React.FC = () => {
     }
   };
 
+  // Format countdown time
+  const formatTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
   const errorMessage = loginError?.message || '';
-  const isRateLimited = errorMessage.includes('terkunci') || errorMessage.includes('Rate limit');
-  const maxAttemptsReached = attempts >= 5;
+  const isRateLimited = errorMessage.includes('terkunci') || errorMessage.includes('Rate limit') || errorMessage.includes('cooldown');
   const isLoading = loginLoading || isSubmitting;
+  
+  // IP Status calculations
+  const isIPBlocked = ipStatus?.is_blocked || false;
+  const remainingTime = ipStatus?.remaining_time || 0;
+  const failedAttempts = ipStatus?.failed_attempts || 0;
+  const attemptsLeft = Math.max(0, 3 - failedAttempts);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-cyan-50 p-4">
-      {/* 🔧 CRITICAL: Form with controlled submission */}
       <form 
         onSubmit={handleLogin}
         className="w-full max-w-md"
@@ -109,12 +125,49 @@ const LoginPage: React.FC = () => {
           </CardHeader>
           
           <CardContent className="space-y-6">
-            {/* Error Display */}
-            {errorMessage && (
+            {/* 🆕 IP Cooldown Alert */}
+            {isIPBlocked && (
+              <Alert variant="destructive" className="border-l-4">
+                <Clock className="h-4 w-4" />
+                <AlertDescription className="space-y-3">
+                  <div className="font-medium">
+                    IP Address dalam Cooldown
+                  </div>
+                  <div className="text-sm">
+                    Terlalu banyak percobaan login gagal. Tunggu {formatTime(remainingTime)} lagi.
+                  </div>
+                  <div className="space-y-2">
+                    <Progress 
+                      value={(1800 - remainingTime) / 1800 * 100} 
+                      className="w-full h-2"
+                    />
+                    <div className="text-xs text-center">
+                      Cooldown berlaku selama 30 menit
+                    </div>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Regular Error Alert */}
+            {errorMessage && !isIPBlocked && (
               <Alert variant={isRateLimited ? "destructive" : "default"} className="border-l-4">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription className="font-medium">
                   {errorMessage}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* 🆕 Attempts Warning */}
+            {!isIPBlocked && failedAttempts > 0 && (
+              <Alert variant="default" className="border-l-4 border-yellow-500">
+                <Shield className="h-4 w-4" />
+                <AlertDescription>
+                  <div className="font-medium">Peringatan Keamanan</div>
+                  <div className="text-sm mt-1">
+                    {failedAttempts} percobaan gagal dari IP ini. {attemptsLeft} percobaan tersisa sebelum cooldown.
+                  </div>
                 </AlertDescription>
               </Alert>
             )}
@@ -134,7 +187,7 @@ const LoginPage: React.FC = () => {
                     onKeyDown={handleKeyDown}
                     placeholder="Masukkan username"
                     className="pl-10 h-11"
-                    disabled={isLoading || maxAttemptsReached}
+                    disabled={isLoading || isIPBlocked}
                     autoComplete="username"
                     autoCapitalize="none"
                     spellCheck={false}
@@ -156,7 +209,7 @@ const LoginPage: React.FC = () => {
                     onKeyDown={handleKeyDown}
                     placeholder="Masukkan password"
                     className="pl-10 pr-10 h-11"
-                    disabled={isLoading || maxAttemptsReached}
+                    disabled={isLoading || isIPBlocked}
                     autoComplete="current-password"
                   />
                   <button
@@ -166,7 +219,7 @@ const LoginPage: React.FC = () => {
                       setShowPassword(!showPassword);
                     }}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    disabled={isLoading || maxAttemptsReached}
+                    disabled={isLoading || isIPBlocked}
                     tabIndex={-1}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -178,13 +231,18 @@ const LoginPage: React.FC = () => {
               <Button
                 type="submit"
                 onClick={handleLogin}
-                className="w-full h-11 bg-blue-600 hover:bg-blue-700"
-                disabled={isLoading || maxAttemptsReached || !username.trim() || !password.trim()}
+                className="w-full h-11 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400"
+                disabled={isLoading || isIPBlocked || !username.trim() || !password.trim()}
               >
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Memverifikasi...
+                  </>
+                ) : isIPBlocked ? (
+                  <>
+                    <Clock className="mr-2 h-4 w-4" />
+                    Tunggu {formatTime(remainingTime)}
                   </>
                 ) : (
                   'Masuk'
@@ -192,15 +250,27 @@ const LoginPage: React.FC = () => {
               </Button>
             </div>
             
-            <div className="text-center">
+            <div className="text-center space-y-2">
               <p className="text-xs text-gray-500">
-                Sistem keamanan aktif. Login attempts: {attempts}/5
+                Sistem keamanan aktif dengan IP cooldown protection
               </p>
-              {/* Debug info for development */}
-              {process.env.NODE_ENV === 'development' && loginError && (
-                <p className="text-xs text-red-500 mt-1">
-                  Debug: {loginError.name} - {loginError.message}
+              {!isIPBlocked && (
+                <p className="text-xs text-gray-600">
+                  IP attempts: {failedAttempts}/3 • User attempts: {attempts}/5
                 </p>
+              )}
+              {/* Debug info for development */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="text-xs text-gray-400 space-y-1">
+                  {ipStatus && (
+                    <p>IP Status: {JSON.stringify(ipStatus, null, 2)}</p>
+                  )}
+                  {loginError && (
+                    <p className="text-red-500">
+                      Debug: {loginError.name} - {loginError.message}
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           </CardContent>

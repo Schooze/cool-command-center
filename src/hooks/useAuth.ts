@@ -1,7 +1,6 @@
-// File: src/hooks/useAuth.ts (enhanced error handling)
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { authService } from '@/services/authService';
-import { User, LoginResponse } from '@/types/auth.types';
+import { User, LoginResponse, IPStatus } from '@/types/auth.types';
 
 export const useAuth = () => {
   const queryClient = useQueryClient();
@@ -25,7 +24,29 @@ export const useAuth = () => {
       }
     },
     retry: false,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // 🆕 NEW: IP Status query
+  const {
+    data: ipStatus,
+    refetch: refetchIPStatus
+  } = useQuery<IPStatus | null>({
+    queryKey: ['ipStatus'],
+    queryFn: async () => {
+      try {
+        return await authService.checkIPStatus();
+      } catch (error) {
+        console.log('❌ Failed to check IP status:', error);
+        return null;
+      }
+    },
+    retry: false,
+    refetchInterval: (data) => {
+      // Auto-refetch if IP is blocked to update countdown
+      return data?.is_blocked ? 1000 : false;
+    },
+    staleTime: 0, // Always fresh for accurate countdown
   });
 
   const loginMutation = useMutation({
@@ -37,14 +58,18 @@ export const useAuth = () => {
       console.log('✅ Login mutation successful:', data.user.username);
       authService.setToken(data.access_token);
       queryClient.setQueryData(['currentUser'], data.user);
+      
+      // Reset IP status after successful login
+      queryClient.setQueryData(['ipStatus'], null);
+      refetchIPStatus();
     },
     onError: (error: any) => {
       console.error('❌ Login mutation failed:', error.message);
-      // 🔧 FIX: Don't redirect or reload on error, just let UI handle it
-      // Error will be available through loginMutation.error
+      
+      // Refresh IP status after failed login to get updated attempt count
+      refetchIPStatus();
     },
-    // 🔧 FIX: Add retry configuration
-    retry: false, // Don't retry login attempts
+    retry: false,
   });
 
   const logoutMutation = useMutation({
@@ -56,15 +81,14 @@ export const useAuth = () => {
       console.log('🧹 Cleaning up after logout');
       authService.removeToken();
       queryClient.setQueryData(['currentUser'], null);
+      queryClient.setQueryData(['ipStatus'], null);
       queryClient.clear();
     },
     onError: (error: any) => {
       console.error('❌ Logout error:', error.message);
-      // Still clean up even if logout request fails
     }
   });
 
-  // 🔧 FIX: Enhanced login function with better error handling
   const login = async (credentials: { username: string; password: string }) => {
     try {
       console.log('🚀 Starting login process...');
@@ -73,13 +97,10 @@ export const useAuth = () => {
       return result;
     } catch (error: any) {
       console.error('❌ Login process failed:', error.message);
-      // 🔧 IMPORTANT: Don't throw error here, let the UI component handle it
-      // through loginMutation.error
       throw error;
     }
   };
 
-  // 🔧 FIX: Enhanced logout function
   const logout = async () => {
     try {
       console.log('🚀 Starting logout process...');
@@ -87,8 +108,11 @@ export const useAuth = () => {
       console.log('✅ Logout process completed');
     } catch (error: any) {
       console.error('❌ Logout process failed:', error.message);
-      // Don't throw error for logout failures
     }
+  };
+
+  const checkIPStatus = async () => {
+    await refetchIPStatus();
   };
 
   return {
@@ -99,8 +123,10 @@ export const useAuth = () => {
     logout,
     loginError: loginMutation.error,
     loginLoading: loginMutation.isPending,
-    // 🔧 ADD: Additional debugging info
     loginStatus: loginMutation.status,
     logoutLoading: logoutMutation.isPending,
+    // 🆕 NEW: IP Status features
+    ipStatus,
+    checkIPStatus,
   };
 };
