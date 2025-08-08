@@ -1,7 +1,8 @@
+// src/components/MainLayout.tsx
 import React from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import AppSidebar from '@/components/AppSidebar';
-import Header from '@/components/Header';
+import AuthenticatedHeader from '@/components/AuthenticatedHeader';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -16,8 +17,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         
         {/* Main Content Area */}
         <SidebarInset className="flex-1">
-          {/* Header */}
-          <Header />
+          {/* Header with Authentication */}
+          <AuthenticatedHeader />
           
           {/* Page Content */}
           <main className="flex-1 overflow-auto">

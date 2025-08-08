@@ -2,6 +2,9 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { PanelLeft } from 'lucide-react';
 import { useSidebar } from '@/components/ui/sidebar';
+import { useAuth } from '@/hooks/useAuth';
+import { Button } from '@/components/ui/button';
+import { LogOut } from 'lucide-react';
 
 interface HeaderProps {
   className?: string;

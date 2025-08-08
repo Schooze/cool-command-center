@@ -3,14 +3,23 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import MainLayout from "@/components/MainLayout";
 import Dashboard from "@/components/Dashboard";
 import AuditDataLogging from "@/components/AuditDataLogging";
 import Config from "@/pages/ConfigPage";
 import ThingsPage from "@/pages/ThingsPage";
 import MaintenancePage from "@/pages/MaintenancePage";
+import LoginPage from "@/pages/LoginPage";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -19,53 +28,62 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          {/* Dashboard Route */}
+          {/* Public Routes */}
+          <Route path="/login" element={<LoginPage />} />
+          
+          {/* Protected Routes */}
           <Route 
             path="/" 
             element={
-              <MainLayout>
-                <Dashboard />
-              </MainLayout>
+              <ProtectedRoute>
+                <MainLayout>
+                  <Dashboard />
+                </MainLayout>
+              </ProtectedRoute>
             } 
           />
           
-          {/* Maintenance Route */}
           <Route 
             path="/maintenance" 
             element={
-              <MainLayout>
-                <MaintenancePage />
-              </MainLayout>
+              <ProtectedRoute>
+                <MainLayout>
+                  <MaintenancePage />
+                </MainLayout>
+              </ProtectedRoute>
             } 
           />
           
-          {/* Things Route */}
           <Route 
             path="/things" 
             element={
-              <MainLayout>
-                <ThingsPage />
-              </MainLayout>
+              <ProtectedRoute>
+                <MainLayout>
+                  <ThingsPage />
+                </MainLayout>
+              </ProtectedRoute>
             } 
           />
           
-          {/* Audit & Data Logging Route */}
           <Route 
             path="/audit" 
             element={
-              <MainLayout>
-                <AuditDataLogging />
-              </MainLayout>
+              <ProtectedRoute>
+                <MainLayout>
+                  <AuditDataLogging />
+                </MainLayout>
+              </ProtectedRoute>
             } 
           />
           
-          {/* Configuration Route */}
           <Route 
             path="/config" 
             element={
-              <MainLayout>
-                <Config />
-              </MainLayout>
+              <ProtectedRoute>
+                <MainLayout>
+                  <Config />
+                </MainLayout>
+              </ProtectedRoute>
             } 
           />
         </Routes>

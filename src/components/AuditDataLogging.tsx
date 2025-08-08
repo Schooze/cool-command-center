@@ -251,44 +251,6 @@ const AuditDataLogging = () => {
           </CardContent>
         </Card>
 
-        {/* B: Setpoint Change History */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Settings className="h-5 w-5" />
-              Riwayat Perubahan Setpoint
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-2">Timestamp</th>
-                    <th className="text-left p-2">User</th>
-                    <th className="text-left p-2">Old</th>
-                    <th className="text-left p-2">New</th>
-                    <th className="text-left p-2">Chamber</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {setpointLogs.map((log, index) => (
-                    <tr key={index} className="border-b">
-                      <td className="p-2 text-xs">{log.timestamp}</td>
-                      <td className="p-2">
-                        <Badge variant="secondary">{log.user}</Badge>
-                      </td>
-                      <td className="p-2">{log.old_setpoint}°C</td>
-                      <td className="p-2">{log.new_setpoint}°C</td>
-                      <td className="p-2">{log.chamber}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* C: Alarm List with Chart */}
         <Card>
           <CardHeader>
@@ -330,6 +292,44 @@ const AuditDataLogging = () => {
                       <td className="p-2 text-xs">{alarm.trigger_time.split(' ')[1]}</td>
                       <td className="p-2 text-xs">{alarm.resolved_time.split(' ')[1]}</td>
                       <td className="p-2 text-xs">{alarm.acknowledged_by}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* B: Setpoint Change History */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Riwayat Perubahan Setpoint
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-2">Timestamp</th>
+                    <th className="text-left p-2">User</th>
+                    <th className="text-left p-2">Old</th>
+                    <th className="text-left p-2">New</th>
+                    <th className="text-left p-2">Chamber</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {setpointLogs.map((log, index) => (
+                    <tr key={index} className="border-b">
+                      <td className="p-2 text-xs">{log.timestamp}</td>
+                      <td className="p-2">
+                        <Badge variant="secondary">{log.user}</Badge>
+                      </td>
+                      <td className="p-2">{log.old_setpoint}°C</td>
+                      <td className="p-2">{log.new_setpoint}°C</td>
+                      <td className="p-2">{log.chamber}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -535,7 +535,7 @@ const AuditDataLogging = () => {
         </Card>
 
         {/* I: Temperature Deviation Heatmap */}
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-1">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Thermometer className="h-5 w-5" />
