@@ -1,5 +1,4 @@
-// File: src/services/authService.ts (enhanced with custom headers)
-
+// File: src/services/authService.ts (FIXED VERSION - No Auto Redirect)
 import axios from 'axios';
 import Cookies from 'js-cookie';
 import { LoginResponse, User } from '@/types/auth.types';
@@ -18,19 +17,15 @@ authAPI.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
   
-  // 🔧 ENHANCEMENT: Add custom headers untuk better tracking
+  // Add custom headers untuk better tracking
   config.headers['X-Client-App'] = 'Koronka-IoT-Dashboard';
   config.headers['X-Client-Version'] = '1.0.0';
   
-  // Browser akan otomatis mengirim User-Agent, tapi kita bisa enhance
+  // Browser info
   const browserInfo = getBrowserInfo();
   config.headers['X-Browser-Info'] = browserInfo;
   
-  console.log('🚀 Request headers:', {
-    'User-Agent': config.headers['User-Agent'] || navigator.userAgent,
-    'X-Client-App': config.headers['X-Client-App'],
-    'X-Browser-Info': browserInfo
-  });
+  console.log('🚀 Request to:', config.url);
   
   return config;
 });
@@ -70,7 +65,7 @@ function getBrowserInfo(): string {
   return `${browser}/${version} (${platform}) ${deviceType} Lang:${language}`;
 }
 
-// Response interceptor untuk handle unauthorized
+// 🔧 FIXED: Response interceptor yang tidak auto-redirect untuk login errors
 authAPI.interceptors.response.use(
   (response) => {
     console.log('✅ Response received:', response.status, response.config.url);
@@ -83,22 +78,35 @@ authAPI.interceptors.response.use(
       message: error.message
     });
     
+    // 🚨 CRITICAL FIX: Don't auto-redirect on login page
     if (error.response?.status === 401) {
-      Cookies.remove('auth_token');
-      window.location.href = '/login';
+      const currentPath = window.location.pathname;
+      
+      // Only redirect if NOT already on login page
+      if (currentPath !== '/login' && currentPath !== '/') {
+        console.log('🔄 Unauthorized - redirecting to login');
+        Cookies.remove('auth_token');
+        window.location.href = '/login';
+      } else {
+        // If already on login page, just remove invalid token but DON'T redirect
+        console.log('🔄 Login failed - removing invalid token');
+        Cookies.remove('auth_token');
+      }
     }
+    
     return Promise.reject(error);
   }
 );
 
 export const authService = {
   async login(username: string, password: string): Promise<LoginResponse> {
-    console.log('🔐 Attempting login with enhanced headers...');
+    console.log('🔐 Attempting login...');
     
     const formData = new FormData();
     formData.append('username', username);
     formData.append('password', password);
     
+    // 🔧 IMPORTANT: Login request should not trigger interceptor redirect
     const response = await authAPI.post('/auth/login', formData);
     return response.data;
   },
@@ -109,7 +117,7 @@ export const authService = {
   },
 
   async logout(): Promise<void> {
-    console.log('🚪 Logging out with user agent tracking...');
+    console.log('🚪 Logging out...');
     await authAPI.post('/auth/logout');
   },
 
@@ -117,7 +125,7 @@ export const authService = {
     Cookies.set('auth_token', token, {
       expires: 7, // 7 days
       secure: false, // Set false untuk development
-      sameSite: 'lax' // Changed for development
+      sameSite: 'lax'
     });
   },
 

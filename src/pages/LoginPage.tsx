@@ -1,4 +1,4 @@
-// File: src/pages/LoginPage.tsx (FIXED VERSION)
+
 import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -17,6 +17,7 @@ const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [attempts, setAttempts] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const from = location.state?.from?.pathname || '/';
 
@@ -24,76 +25,71 @@ const LoginPage: React.FC = () => {
     if (loginError) {
       setAttempts(prev => prev + 1);
       setPassword(''); // Clear password on error
+      setIsSubmitting(false); // Reset submitting state
     }
   }, [loginError]);
 
+  // Redirect if authenticated
   if (isAuthenticated) {
     return <Navigate to={from} replace />;
   }
 
-  // 🔧 FIX 1: Unified form submission handler
-  const handleFormSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); // 🚨 CRITICAL: Prevent browser default form submission
-    event.stopPropagation(); // Stop event bubbling
+  // 🔧 MAIN FIX: Single, comprehensive form submission handler
+  const handleLogin = async (event?: React.FormEvent | React.MouseEvent) => {
+    // Always prevent default behavior
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
     
-    // Validate inputs
-    if (!username || !password) return;
+    // Validation
+    if (!username.trim() || !password.trim()) {
+      console.log('❌ Empty username or password');
+      return;
+    }
+    
+    if (isSubmitting || loginLoading) {
+      console.log('❌ Already submitting');
+      return;
+    }
     
     try {
-      console.log('🔐 Attempting login for:', username);
-      await login({ username, password });
-    } catch (error) {
-      // Error is handled by useAuth hook through react-query
-      console.log('Login error handled by useAuth:', error);
-    }
-  };
-
-  // 🔧 FIX 2: Separate button click handler (for compatibility)
-  const handleButtonClick = (event: React.MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault(); // Prevent any default behavior
-    
-    // Create a synthetic form event and call the form handler
-    const form = event.currentTarget.closest('form');
-    if (form) {
-      const formEvent = new Event('submit', { cancelable: true, bubbles: true }) as any;
-      formEvent.preventDefault = () => {}; // Mock preventDefault
-      formEvent.stopPropagation = () => {}; // Mock stopPropagation
-      handleFormSubmit({ 
-        preventDefault: () => {}, 
-        stopPropagation: () => {},
-        currentTarget: form 
-      } as any);
-    }
-  };
-
-  // 🔧 FIX 3: Proper keyboard event handling
-  const handleKeyPress = (event: React.KeyboardEvent) => {
-    if (event.key === 'Enter') {
-      event.preventDefault(); // Prevent default Enter behavior
+      setIsSubmitting(true);
+      console.log('🔐 Login attempt for:', username);
       
-      // Find the form and submit it properly
-      const form = event.currentTarget.closest('form');
-      if (form) {
-        handleFormSubmit({ 
-          preventDefault: () => {}, 
-          stopPropagation: () => {},
-          currentTarget: form 
-        } as any);
-      }
+      await login({ username: username.trim(), password });
+      
+      console.log('✅ Login successful');
+      // Navigation will be handled by the useAuth hook and Navigate component
+      
+    } catch (error: any) {
+      console.error('❌ Login error:', error.message);
+      // Error state is handled by useAuth hook automatically
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle Enter key press
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      handleLogin();
     }
   };
 
   const errorMessage = loginError?.message || '';
   const isRateLimited = errorMessage.includes('terkunci') || errorMessage.includes('Rate limit');
   const maxAttemptsReached = attempts >= 5;
+  const isLoading = loginLoading || isSubmitting;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-cyan-50 p-4">
-      {/* 🔧 FIX 4: Proper form element with controlled submission */}
+      {/* 🔧 CRITICAL: Form with controlled submission */}
       <form 
-        onSubmit={handleFormSubmit}
+        onSubmit={handleLogin}
         className="w-full max-w-md"
-        noValidate // Prevent browser validation to control our own
+        noValidate
       >
         <Card className="w-full shadow-2xl border-0">
           <CardHeader className="space-y-4 pb-6">
@@ -113,6 +109,7 @@ const LoginPage: React.FC = () => {
           </CardHeader>
           
           <CardContent className="space-y-6">
+            {/* Error Display */}
             {errorMessage && (
               <Alert variant={isRateLimited ? "destructive" : "default"} className="border-l-4">
                 <AlertCircle className="h-4 w-4" />
@@ -123,6 +120,7 @@ const LoginPage: React.FC = () => {
             )}
             
             <div className="space-y-4">
+              {/* Username Field */}
               <div className="space-y-2">
                 <Label htmlFor="username">Username</Label>
                 <div className="relative">
@@ -133,10 +131,10 @@ const LoginPage: React.FC = () => {
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    onKeyDown={handleKeyPress} // 🔧 FIX: Proper key handling
+                    onKeyDown={handleKeyDown}
                     placeholder="Masukkan username"
                     className="pl-10 h-11"
-                    disabled={loginLoading || maxAttemptsReached}
+                    disabled={isLoading || maxAttemptsReached}
                     autoComplete="username"
                     autoCapitalize="none"
                     spellCheck={false}
@@ -144,6 +142,7 @@ const LoginPage: React.FC = () => {
                 </div>
               </div>
               
+              {/* Password Field */}
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <div className="relative">
@@ -154,35 +153,35 @@ const LoginPage: React.FC = () => {
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    onKeyDown={handleKeyPress} // 🔧 FIX: Proper key handling
+                    onKeyDown={handleKeyDown}
                     placeholder="Masukkan password"
                     className="pl-10 pr-10 h-11"
-                    disabled={loginLoading || maxAttemptsReached}
+                    disabled={isLoading || maxAttemptsReached}
                     autoComplete="current-password"
                   />
                   <button
-                    type="button" // 🚨 CRITICAL: Explicit button type to prevent form submission
+                    type="button"
                     onClick={(e) => {
-                      e.preventDefault(); // Prevent any form interaction
+                      e.preventDefault();
                       setShowPassword(!showPassword);
                     }}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    disabled={loginLoading || maxAttemptsReached}
-                    tabIndex={-1} // Remove from tab order
+                    disabled={isLoading || maxAttemptsReached}
+                    tabIndex={-1}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
               </div>
               
-              {/* 🔧 FIX 5: Proper submit button */}
+              {/* Submit Button */}
               <Button
                 type="submit"
-                onClick={handleButtonClick} // Backup click handler
+                onClick={handleLogin}
                 className="w-full h-11 bg-blue-600 hover:bg-blue-700"
-                disabled={loginLoading || maxAttemptsReached || !username.trim() || !password.trim()}
+                disabled={isLoading || maxAttemptsReached || !username.trim() || !password.trim()}
               >
-                {loginLoading ? (
+                {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Memverifikasi...
