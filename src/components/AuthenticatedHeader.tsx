@@ -83,7 +83,7 @@ const AuthenticatedHeader: React.FC<AuthenticatedHeaderProps> = ({ className }) 
           </Button>
 
           {/* Logo and System Name */}
-          <div className="flex items-center space-x-3">
+          {/* <div className="flex items-center space-x-3">
             <div className="flex items-center space-x-2">
               <Snowflake className="h-6 w-6 text-blue-600" />
               <div className="hidden sm:block">
@@ -95,6 +95,13 @@ const AuthenticatedHeader: React.FC<AuthenticatedHeaderProps> = ({ className }) 
                 </p>
               </div>
             </div>
+          </div> */}
+          <div className="flex items-center">
+            <img
+              src="/koronka_text_clear.png"
+              alt="Koronka Logo"
+              className="h-8 w-auto"
+            />
           </div>
         </div>
 
