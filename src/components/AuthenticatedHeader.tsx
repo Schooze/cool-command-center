@@ -107,14 +107,6 @@ const AuthenticatedHeader: React.FC<AuthenticatedHeaderProps> = ({ className }) 
 
         {/* Right Section - User Info & Actions */}
         <div className="flex items-center space-x-4">
-          {/* System Status Indicator */}
-          <div className="hidden md:flex items-center space-x-2">
-            <div className="flex items-center space-x-1">
-              <div className="h-2 w-2 bg-green-400 rounded-full animate-pulse"></div>
-              <span className="text-xs text-gray-600">System Online</span>
-            </div>
-          </div>
-
           {/* User Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

@@ -108,18 +108,20 @@ const LoginPage: React.FC = () => {
         noValidate
       >
         <Card className="w-full shadow-2xl border-0">
-          <CardHeader className="space-y-4 pb-6">
+          <CardHeader className="space-y-3 pb-2">
             <div className="flex justify-center">
-              <div className="p-3 rounded-full bg-blue-100">
-                <Snowflake className="h-8 w-8 text-blue-600" />
-              </div>
+                <img
+                  src="/koronka_text_clear.png"
+                  alt="Logo Koronka"
+                  className="h-16 w-auto max-w-[150px] object-contain sm:h-20 md:h-24"
+                />
             </div>
             <div className="text-center">
               <CardTitle className="text-2xl font-bold text-gray-900">
                 Koronka Control System
               </CardTitle>
               <p className="text-sm text-gray-600 mt-2">
-                Sistem Monitoring Pendingin Daging
+                Freezer Monitoring & Control Panel
               </p>
             </div>
           </CardHeader>
@@ -260,7 +262,7 @@ const LoginPage: React.FC = () => {
                 </p>
               )}
               {/* Debug info for development */}
-              {process.env.NODE_ENV === 'development' && (
+              {/* {process.env.NODE_ENV === 'development' && (
                 <div className="text-xs text-gray-400 space-y-1">
                   {ipStatus && (
                     <p>IP Status: {JSON.stringify(ipStatus, null, 2)}</p>
@@ -271,7 +273,7 @@ const LoginPage: React.FC = () => {
                     </p>
                   )}
                 </div>
-              )}
+              )} */}
             </div>
           </CardContent>
         </Card>
