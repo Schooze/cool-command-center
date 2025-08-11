@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, X, Settings, Thermometer, Fan, Snowflake, AlertTriangle, Activity, BarChart3, Gauge, TrendingUp, Map, Clock, Wrench, Power, Zap, Droplets } from 'lucide-react';
+import { Plus, X, Settings, Thermometer, Fan, Snowflake, AlertTriangle, Activity, BarChart3, Gauge, TrendingUp, Map, Clock, Wrench, Power, Zap, Droplets, GripVertical } from 'lucide-react';
 
 // Mock data untuk simulasi berdasarkan dashboard yang ada
 const mockDevices = [
@@ -23,12 +23,11 @@ const widgetTypes = [
   { id: 'environmental', name: 'Environmental', icon: Droplets, description: 'Humidity and pressure' }
 ];
 
-// Widget Components based on the existing dashboard
-const TempChartWidget = ({ config, onRemove, onSettings }) => {
+// Widget Components with drag and drop support
+const TempChartWidget = ({ config, onRemove, onSettings, isDragging, dragHandleProps }) => {
   const [chartData, setChartData] = useState([]);
 
   useEffect(() => {
-    // Generate historical data
     const data = Array.from({ length: 24 }, (_, i) => {
       const baseTemp = -18;
       const fluctuation = Math.sin(i * Math.PI / 12) * 2;
@@ -40,7 +39,6 @@ const TempChartWidget = ({ config, onRemove, onSettings }) => {
     });
     setChartData(data);
 
-    // Update periodically
     const interval = setInterval(() => {
       setChartData(prev => {
         const newData = [...prev.slice(1)];
@@ -57,9 +55,16 @@ const TempChartWidget = ({ config, onRemove, onSettings }) => {
   }, []);
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border p-4 h-full">
+    <div className={`bg-white rounded-lg shadow-sm border p-4 h-full transition-all duration-200 ${
+      isDragging ? 'shadow-lg ring-2 ring-blue-500 rotate-2 scale-105' : 'hover:shadow-md'
+    }`}>
       <div className="flex justify-between items-center mb-3">
-        <h3 className="font-medium text-gray-900">{config.title}</h3>
+        <div className="flex items-center gap-2">
+          <div {...dragHandleProps} className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded">
+            <GripVertical className="w-4 h-4 text-gray-400 pointer-events-none" />
+          </div>
+          <h3 className="font-medium text-gray-900">{config.title}</h3>
+        </div>
         <div className="flex gap-1">
           <button onClick={onSettings} className="p-1 hover:bg-gray-100 rounded">
             <Settings className="w-4 h-4 text-gray-500" />
@@ -77,25 +82,19 @@ const TempChartWidget = ({ config, onRemove, onSettings }) => {
               <stop offset="100%" stopColor="#3b82f6" stopOpacity="0"/>
             </linearGradient>
           </defs>
-          
-          {/* Grid lines */}
           {[0, 45, 90, 135, 180].map(y => (
             <line key={y} x1="40" y1={y} x2="380" y2={y} stroke="#e5e7eb" strokeWidth="1"/>
           ))}
-          
-          {/* Temperature line */}
           <polyline
             fill="none"
             stroke="#3b82f6"
             strokeWidth="2"
             points={chartData.slice(-12).map((point, i) => {
               const x = 40 + (i * 28);
-              const y = 90 - (point.value + 20) * 2; // Scale and offset
+              const y = 90 - (point.value + 20) * 2;
               return `${x},${y}`;
             }).join(' ')}
           />
-          
-          {/* Fill area */}
           <polygon
             fill="url(#tempGradient)"
             points={`40,180 ${chartData.slice(-12).map((point, i) => {
@@ -104,8 +103,6 @@ const TempChartWidget = ({ config, onRemove, onSettings }) => {
               return `${x},${y}`;
             }).join(' ')} 380,180`}
           />
-          
-          {/* Y-axis labels */}
           <text x="30" y="25" fontSize="10" fill="#6b7280" textAnchor="end">-10°C</text>
           <text x="30" y="70" fontSize="10" fill="#6b7280" textAnchor="end">-15°C</text>
           <text x="30" y="115" fontSize="10" fill="#6b7280" textAnchor="end">-20°C</text>
@@ -119,7 +116,7 @@ const TempChartWidget = ({ config, onRemove, onSettings }) => {
   );
 };
 
-const TempGaugeWidget = ({ config, onRemove, onSettings }) => {
+const TempGaugeWidget = ({ config, onRemove, onSettings, isDragging, dragHandleProps }) => {
   const [temperature, setTemperature] = useState(-18.5);
 
   useEffect(() => {
@@ -132,9 +129,16 @@ const TempGaugeWidget = ({ config, onRemove, onSettings }) => {
   const percentage = Math.max(0, Math.min(100, (temperature + 30) / 40 * 100));
   
   return (
-    <div className="bg-white rounded-lg shadow-sm border p-4 h-full flex flex-col">
+    <div className={`bg-white rounded-lg shadow-sm border p-4 h-full flex flex-col transition-all duration-200 ${
+      isDragging ? 'shadow-lg ring-2 ring-blue-500 rotate-2 scale-105' : 'hover:shadow-md'
+    }`}>
       <div className="flex justify-between items-center mb-3">
-        <h3 className="font-medium text-gray-900">{config.title}</h3>
+        <div className="flex items-center gap-2">
+          <div {...dragHandleProps} className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded">
+            <GripVertical className="w-4 h-4 text-gray-400 pointer-events-none" />
+          </div>
+          <h3 className="font-medium text-gray-900">{config.title}</h3>
+        </div>
         <div className="flex gap-1">
           <button onClick={onSettings} className="p-1 hover:bg-gray-100 rounded">
             <Settings className="w-4 h-4 text-gray-500" />
@@ -147,21 +151,11 @@ const TempGaugeWidget = ({ config, onRemove, onSettings }) => {
       <div className="flex-1 flex items-center justify-center">
         <div className="relative w-32 h-32">
           <svg className="w-32 h-32 transform -rotate-90">
+            <circle cx="64" cy="64" r="50" stroke="#e5e7eb" strokeWidth="8" fill="none" />
             <circle
-              cx="64"
-              cy="64"
-              r="50"
-              stroke="#e5e7eb"
-              strokeWidth="8"
-              fill="none"
-            />
-            <circle
-              cx="64"
-              cy="64"
-              r="50"
+              cx="64" cy="64" r="50"
               stroke={temperature < -20 ? "#3b82f6" : temperature < -15 ? "#f59e0b" : "#ef4444"}
-              strokeWidth="8"
-              fill="none"
+              strokeWidth="8" fill="none"
               strokeDasharray={`${percentage * 3.14} 314`}
               className="transition-all duration-500"
             />
@@ -172,19 +166,14 @@ const TempGaugeWidget = ({ config, onRemove, onSettings }) => {
           </div>
         </div>
       </div>
-      <div className="text-center text-sm text-gray-600">
-        {config.device}
-      </div>
+      <div className="text-center text-sm text-gray-600">{config.device}</div>
     </div>
   );
 };
 
-const SensorCardWidget = ({ config, onRemove, onSettings }) => {
+const SensorCardWidget = ({ config, onRemove, onSettings, isDragging, dragHandleProps }) => {
   const [sensorData, setSensorData] = useState({
-    value: -18.2,
-    status: 'normal',
-    min: -20,
-    max: -10
+    value: -18.2, status: 'normal', min: -20, max: -10
   });
 
   useEffect(() => {
@@ -206,9 +195,16 @@ const SensorCardWidget = ({ config, onRemove, onSettings }) => {
   };
   
   return (
-    <div className="bg-white rounded-lg shadow-sm border p-4 h-full">
+    <div className={`bg-white rounded-lg shadow-sm border p-4 h-full transition-all duration-200 ${
+      isDragging ? 'shadow-lg ring-2 ring-blue-500 rotate-2 scale-105' : 'hover:shadow-md'
+    }`}>
       <div className="flex justify-between items-center mb-3">
-        <h3 className="font-medium text-gray-900">{config.title}</h3>
+        <div className="flex items-center gap-2">
+          <div {...dragHandleProps} className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded">
+            <GripVertical className="w-4 h-4 text-gray-400 pointer-events-none" />
+          </div>
+          <h3 className="font-medium text-gray-900">{config.title}</h3>
+        </div>
         <div className="flex gap-1">
           <button onClick={onSettings} className="p-1 hover:bg-gray-100 rounded">
             <Settings className="w-4 h-4 text-gray-500" />
@@ -220,43 +216,44 @@ const SensorCardWidget = ({ config, onRemove, onSettings }) => {
       </div>
       <div className="flex items-center justify-center flex-1 flex-col space-y-3">
         <div className="text-center">
-          <div className="text-4xl font-bold text-blue-600">
-            {sensorData.value.toFixed(1)}°C
-          </div>
-          <div className="text-sm text-gray-500 mt-1">
-            {config.device} - {config.sensor}
-          </div>
+          <div className="text-4xl font-bold text-blue-600">{sensorData.value.toFixed(1)}°C</div>
+          <div className="text-sm text-gray-500 mt-1">{config.device} - {config.sensor}</div>
         </div>
         <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusColors[sensorData.status]}`}>
           {sensorData.status.charAt(0).toUpperCase() + sensorData.status.slice(1)}
         </div>
-        <div className="text-xs text-gray-500 text-center">
-          Range: {sensorData.min}°C to {sensorData.max}°C
-        </div>
+        <div className="text-xs text-gray-500 text-center">Range: {sensorData.min}°C to {sensorData.max}°C</div>
       </div>
     </div>
   );
 };
 
-const DigitalStatusWidget = ({ config, onRemove, onSettings }) => {
-  const [digitalInputs] = useState([
+const DigitalStatusWidget = ({ config, onRemove, onSettings, isDragging, dragHandleProps }) => {
+  const digitalInputs = [
     { id: 'di1', name: 'Door Switch', active: false },
     { id: 'di2', name: 'Emergency Stop', active: false },
     { id: 'di3', name: 'High Pressure', active: false }
-  ]);
+  ];
 
-  const [digitalOutputs] = useState([
+  const digitalOutputs = [
     { id: 'do1', name: 'Compressor', active: true },
     { id: 'do2', name: 'Fan 1', active: true },
     { id: 'do3', name: 'Fan 2', active: false },
     { id: 'do4', name: 'Defrost Heater', active: false },
     { id: 'do5', name: 'Alarm', active: false }
-  ]);
+  ];
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border p-4 h-full">
+    <div className={`bg-white rounded-lg shadow-sm border p-4 h-full transition-all duration-200 ${
+      isDragging ? 'shadow-lg ring-2 ring-blue-500 rotate-2 scale-105' : 'hover:shadow-md'
+    }`}>
       <div className="flex justify-between items-center mb-3">
-        <h3 className="font-medium text-gray-900">{config.title}</h3>
+        <div className="flex items-center gap-2">
+          <div {...dragHandleProps} className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded">
+            <GripVertical className="w-4 h-4 text-gray-400 pointer-events-none" />
+          </div>
+          <h3 className="font-medium text-gray-900">{config.title}</h3>
+        </div>
         <div className="flex gap-1">
           <button onClick={onSettings} className="p-1 hover:bg-gray-100 rounded">
             <Settings className="w-4 h-4 text-gray-500" />
@@ -278,7 +275,6 @@ const DigitalStatusWidget = ({ config, onRemove, onSettings }) => {
             ))}
           </div>
         </div>
-        
         <div>
           <h4 className="font-medium mb-2 text-sm text-gray-700">Digital Outputs</h4>
           <div className="space-y-2">
@@ -295,7 +291,7 @@ const DigitalStatusWidget = ({ config, onRemove, onSettings }) => {
   );
 };
 
-const ElectricalWidget = ({ config, onRemove, onSettings }) => {
+const ElectricalWidget = ({ config, onRemove, onSettings, isDragging, dragHandleProps }) => {
   const [electrical, setElectrical] = useState([
     { id: 'current', name: 'Current', value: 8.5, unit: 'A', min: 0, max: 15 },
     { id: 'voltage', name: 'Voltage', value: 230.2, unit: 'V', min: 200, max: 250 }
@@ -312,9 +308,16 @@ const ElectricalWidget = ({ config, onRemove, onSettings }) => {
   }, []);
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border p-4 h-full">
+    <div className={`bg-white rounded-lg shadow-sm border p-4 h-full transition-all duration-200 ${
+      isDragging ? 'shadow-lg ring-2 ring-blue-500 rotate-2 scale-105' : 'hover:shadow-md'
+    }`}>
       <div className="flex justify-between items-center mb-3">
-        <h3 className="font-medium text-gray-900">{config.title}</h3>
+        <div className="flex items-center gap-2">
+          <div {...dragHandleProps} className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded">
+            <GripVertical className="w-4 h-4 text-gray-400 pointer-events-none" />
+          </div>
+          <h3 className="font-medium text-gray-900">{config.title}</h3>
+        </div>
         <div className="flex gap-1">
           <button onClick={onSettings} className="p-1 hover:bg-gray-100 rounded">
             <Settings className="w-4 h-4 text-gray-500" />
@@ -329,9 +332,7 @@ const ElectricalWidget = ({ config, onRemove, onSettings }) => {
           <div key={item.id} className="flex items-center justify-between p-3 border rounded">
             <div>
               <div className="font-medium">{item.name}</div>
-              <div className="text-xs text-gray-500">
-                {item.min}-{item.max}{item.unit}
-              </div>
+              <div className="text-xs text-gray-500">{item.min}-{item.max}{item.unit}</div>
             </div>
             <div className="text-right">
               <div className="text-lg font-bold">{item.value.toFixed(1)}{item.unit}</div>
@@ -344,7 +345,7 @@ const ElectricalWidget = ({ config, onRemove, onSettings }) => {
   );
 };
 
-const AlarmPanelWidget = ({ config, onRemove, onSettings }) => {
+const AlarmPanelWidget = ({ config, onRemove, onSettings, isDragging, dragHandleProps }) => {
   const alarms = [
     { type: 'High Temperature', device: 'Chamber A', time: '2 min ago', severity: 'high' },
     { type: 'Door Open', device: 'Chamber B', time: '5 min ago', severity: 'medium' },
@@ -352,9 +353,16 @@ const AlarmPanelWidget = ({ config, onRemove, onSettings }) => {
   ];
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border p-4 h-full">
+    <div className={`bg-white rounded-lg shadow-sm border p-4 h-full transition-all duration-200 ${
+      isDragging ? 'shadow-lg ring-2 ring-blue-500 rotate-2 scale-105' : 'hover:shadow-md'
+    }`}>
       <div className="flex justify-between items-center mb-3">
-        <h3 className="font-medium text-gray-900">{config.title}</h3>
+        <div className="flex items-center gap-2">
+          <div {...dragHandleProps} className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded">
+            <GripVertical className="w-4 h-4 text-gray-400 pointer-events-none" />
+          </div>
+          <h3 className="font-medium text-gray-900">{config.title}</h3>
+        </div>
         <div className="flex gap-1">
           <button onClick={onSettings} className="p-1 hover:bg-gray-100 rounded">
             <Settings className="w-4 h-4 text-gray-500" />
@@ -388,11 +396,18 @@ const AlarmPanelWidget = ({ config, onRemove, onSettings }) => {
   );
 };
 
-const SystemOverviewWidget = ({ config, onRemove, onSettings }) => {
+const SystemOverviewWidget = ({ config, onRemove, onSettings, isDragging, dragHandleProps }) => {
   return (
-    <div className="bg-white rounded-lg shadow-sm border p-4 h-full">
+    <div className={`bg-white rounded-lg shadow-sm border p-4 h-full transition-all duration-200 ${
+      isDragging ? 'shadow-lg ring-2 ring-blue-500 rotate-2 scale-105' : 'hover:shadow-md'
+    }`}>
       <div className="flex justify-between items-center mb-3">
-        <h3 className="font-medium text-gray-900">{config.title}</h3>
+        <div className="flex items-center gap-2">
+          <div {...dragHandleProps} className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded">
+            <GripVertical className="w-4 h-4 text-gray-400 pointer-events-none" />
+          </div>
+          <h3 className="font-medium text-gray-900">{config.title}</h3>
+        </div>
         <div className="flex gap-1">
           <button onClick={onSettings} className="p-1 hover:bg-gray-100 rounded">
             <Settings className="w-4 h-4 text-gray-500" />
@@ -424,7 +439,7 @@ const SystemOverviewWidget = ({ config, onRemove, onSettings }) => {
   );
 };
 
-const EnvironmentalWidget = ({ config, onRemove, onSettings }) => {
+const EnvironmentalWidget = ({ config, onRemove, onSettings, isDragging, dragHandleProps }) => {
   const [envData, setEnvData] = useState([
     { id: 'humidity', name: 'Humidity', value: 65.2, unit: '%', min: 40, max: 80 },
     { id: 'pressure', name: 'Pressure', value: 1013.2, unit: 'hPa', min: 950, max: 1050 }
@@ -441,9 +456,16 @@ const EnvironmentalWidget = ({ config, onRemove, onSettings }) => {
   }, []);
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border p-4 h-full">
+    <div className={`bg-white rounded-lg shadow-sm border p-4 h-full transition-all duration-200 ${
+      isDragging ? 'shadow-lg ring-2 ring-blue-500 rotate-2 scale-105' : 'hover:shadow-md'
+    }`}>
       <div className="flex justify-between items-center mb-3">
-        <h3 className="font-medium text-gray-900">{config.title}</h3>
+        <div className="flex items-center gap-2">
+          <div {...dragHandleProps} className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded">
+            <GripVertical className="w-4 h-4 text-gray-400 pointer-events-none" />
+          </div>
+          <h3 className="font-medium text-gray-900">{config.title}</h3>
+        </div>
         <div className="flex gap-1">
           <button onClick={onSettings} className="p-1 hover:bg-gray-100 rounded">
             <Settings className="w-4 h-4 text-gray-500" />
@@ -458,9 +480,7 @@ const EnvironmentalWidget = ({ config, onRemove, onSettings }) => {
           <div key={item.id} className="flex items-center justify-between p-3 border rounded">
             <div>
               <div className="font-medium">{item.name}</div>
-              <div className="text-xs text-gray-500">
-                {item.min}-{item.max}{item.unit}
-              </div>
+              <div className="text-xs text-gray-500">{item.min}-{item.max}{item.unit}</div>
             </div>
             <div className="text-right">
               <div className="text-lg font-bold">{item.value.toFixed(1)}{item.unit}</div>
@@ -473,24 +493,103 @@ const EnvironmentalWidget = ({ config, onRemove, onSettings }) => {
   );
 };
 
-const WidgetRenderer = ({ widget, onRemove, onSettings }) => {
+// Drag and Drop Implementation - Simplified
+const DraggableWidget = ({ widget, index, onRemove, onSettings, onReorder }) => {
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const dragRef = useRef(null);
+  const startPos = useRef({ x: 0, y: 0 });
+
+  const handleMouseDown = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+    startPos.current = { x: e.clientX, y: e.clientY };
+    setDragOffset({ x: 0, y: 0 });
+    
+    const handleMouseMove = (moveEvent) => {
+      const deltaX = moveEvent.clientX - startPos.current.x;
+      const deltaY = moveEvent.clientY - startPos.current.y;
+      setDragOffset({ x: deltaX, y: deltaY });
+    };
+    
+    const handleMouseUp = (upEvent) => {
+      setIsDragging(false);
+      setDragOffset({ x: 0, y: 0 });
+      
+      // Simple reorder logic
+      const gridContainer = document.querySelector('.widget-grid');
+      if (gridContainer) {
+        const widgets = Array.from(gridContainer.children);
+        const rect = gridContainer.getBoundingClientRect();
+        const x = upEvent.clientX - rect.left;
+        const y = upEvent.clientY - rect.top;
+        
+        let targetIndex = index;
+        widgets.forEach((widgetEl, i) => {
+          const widgetRect = widgetEl.getBoundingClientRect();
+          if (x >= widgetRect.left - rect.left && 
+              x <= widgetRect.right - rect.left && 
+              y >= widgetRect.top - rect.top && 
+              y <= widgetRect.bottom - rect.top) {
+            targetIndex = i;
+          }
+        });
+        
+        if (targetIndex !== index) {
+          onReorder(index, targetIndex);
+        }
+      }
+      
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+    
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const dragHandleProps = {
+    onMouseDown: handleMouseDown
+  };
+
+  const style = isDragging ? {
+    transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)`,
+    zIndex: 1000,
+    position: 'relative',
+    pointerEvents: 'none'
+  } : {};
+
+  return (
+    <div ref={dragRef} style={style} className="transition-transform duration-200">
+      <WidgetRenderer
+        widget={widget}
+        onRemove={onRemove}
+        onSettings={onSettings}
+        isDragging={isDragging}
+        dragHandleProps={dragHandleProps}
+      />
+    </div>
+  );
+};
+
+const WidgetRenderer = ({ widget, onRemove, onSettings, isDragging, dragHandleProps }) => {
   switch (widget.type) {
     case 'temp-chart':
-      return <TempChartWidget config={widget} onRemove={onRemove} onSettings={onSettings} />;
+      return <TempChartWidget config={widget} onRemove={onRemove} onSettings={onSettings} isDragging={isDragging} dragHandleProps={dragHandleProps} />;
     case 'temp-gauge':
-      return <TempGaugeWidget config={widget} onRemove={onRemove} onSettings={onSettings} />;
+      return <TempGaugeWidget config={widget} onRemove={onRemove} onSettings={onSettings} isDragging={isDragging} dragHandleProps={dragHandleProps} />;
     case 'sensor-card':
-      return <SensorCardWidget config={widget} onRemove={onRemove} onSettings={onSettings} />;
+      return <SensorCardWidget config={widget} onRemove={onRemove} onSettings={onSettings} isDragging={isDragging} dragHandleProps={dragHandleProps} />;
     case 'digital-status':
-      return <DigitalStatusWidget config={widget} onRemove={onRemove} onSettings={onSettings} />;
+      return <DigitalStatusWidget config={widget} onRemove={onRemove} onSettings={onSettings} isDragging={isDragging} dragHandleProps={dragHandleProps} />;
     case 'electrical':
-      return <ElectricalWidget config={widget} onRemove={onRemove} onSettings={onSettings} />;
+      return <ElectricalWidget config={widget} onRemove={onRemove} onSettings={onSettings} isDragging={isDragging} dragHandleProps={dragHandleProps} />;
     case 'alarm-panel':
-      return <AlarmPanelWidget config={widget} onRemove={onRemove} onSettings={onSettings} />;
+      return <AlarmPanelWidget config={widget} onRemove={onRemove} onSettings={onSettings} isDragging={isDragging} dragHandleProps={dragHandleProps} />;
     case 'system-overview':
-      return <SystemOverviewWidget config={widget} onRemove={onRemove} onSettings={onSettings} />;
+      return <SystemOverviewWidget config={widget} onRemove={onRemove} onSettings={onSettings} isDragging={isDragging} dragHandleProps={dragHandleProps} />;
     case 'environmental':
-      return <EnvironmentalWidget config={widget} onRemove={onRemove} onSettings={onSettings} />;
+      return <EnvironmentalWidget config={widget} onRemove={onRemove} onSettings={onSettings} isDragging={isDragging} dragHandleProps={dragHandleProps} />;
     default:
       return <div>Unknown widget type</div>;
   }
@@ -514,7 +613,6 @@ const AddWidgetModal = ({ isOpen, onClose, onAdd }) => {
       sensor: selectedSensor
     });
     
-    // Reset form
     setStep(1);
     setSelectedType('');
     setSelectedDevice('');
@@ -536,7 +634,6 @@ const AddWidgetModal = ({ isOpen, onClose, onAdd }) => {
             </button>
           </div>
 
-          {/* Progress Steps */}
           <div className="mb-6">
             <div className="flex items-center">
               {[1, 2, 3].map((num) => (
@@ -559,7 +656,6 @@ const AddWidgetModal = ({ isOpen, onClose, onAdd }) => {
             </div>
           </div>
 
-          {/* Step 1: Widget Type */}
           {step === 1 && (
             <div>
               <h3 className="font-medium mb-4">Select Widget Type</h3>
@@ -592,13 +688,10 @@ const AddWidgetModal = ({ isOpen, onClose, onAdd }) => {
             </div>
           )}
 
-          {/* Step 2: Device & Sensor */}
           {step === 2 && (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Device
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select Device</label>
                 <select
                   value={selectedDevice}
                   onChange={(e) => setSelectedDevice(e.target.value)}
@@ -612,11 +705,8 @@ const AddWidgetModal = ({ isOpen, onClose, onAdd }) => {
                   ))}
                 </select>
               </div>
-
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Sensor
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select Sensor</label>
                 <select
                   value={selectedSensor}
                   onChange={(e) => setSelectedSensor(e.target.value)}
@@ -624,22 +714,17 @@ const AddWidgetModal = ({ isOpen, onClose, onAdd }) => {
                 >
                   <option value="">Choose a sensor...</option>
                   {mockSensors.map((sensor) => (
-                    <option key={sensor} value={sensor}>
-                      {sensor}
-                    </option>
+                    <option key={sensor} value={sensor}>{sensor}</option>
                   ))}
                 </select>
               </div>
             </div>
           )}
 
-          {/* Step 3: Configuration */}
           {step === 3 && (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Widget Title
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Widget Title</label>
                 <input
                   type="text"
                   value={title}
@@ -648,7 +733,6 @@ const AddWidgetModal = ({ isOpen, onClose, onAdd }) => {
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
-
               <div className="bg-gray-50 rounded-lg p-4">
                 <h4 className="font-medium text-gray-900 mb-2">Preview</h4>
                 <div className="text-sm text-gray-600">
@@ -661,7 +745,6 @@ const AddWidgetModal = ({ isOpen, onClose, onAdd }) => {
             </div>
           )}
 
-          {/* Navigation Buttons */}
           <div className="flex justify-between mt-6">
             <button
               onClick={() => setStep(Math.max(1, step - 1))}
@@ -670,7 +753,6 @@ const AddWidgetModal = ({ isOpen, onClose, onAdd }) => {
             >
               Previous
             </button>
-            
             {step < 3 ? (
               <button
                 onClick={() => setStep(step + 1)}
@@ -697,62 +779,14 @@ const AddWidgetModal = ({ isOpen, onClose, onAdd }) => {
 
 export default function Dashboard() {
   const [widgets, setWidgets] = useState([
-    {
-      id: '1',
-      type: 'temp-chart',
-      title: 'Temperature Trend',
-      device: 'Chamber A',
-      sensor: 'Temperature'
-    },
-    {
-      id: '2',
-      type: 'temp-gauge',
-      title: 'Current Temperature',
-      device: 'Chamber A',
-      sensor: 'Temperature'
-    },
-    {
-      id: '3',
-      type: 'sensor-card',
-      title: 'Product Temperature',
-      device: 'Chamber B',
-      sensor: 'Temperature'
-    },
-    {
-      id: '4',
-      type: 'digital-status',
-      title: 'Digital I/O Status',
-      device: 'Chamber A',
-      sensor: ''
-    },
-    {
-      id: '5',
-      type: 'electrical',
-      title: 'Electrical Monitoring',
-      device: 'Chamber A',
-      sensor: 'Current'
-    },
-    {
-      id: '6',
-      type: 'alarm-panel',
-      title: 'Active Alarms',
-      device: '',
-      sensor: ''
-    },
-    {
-      id: '7',
-      type: 'system-overview',
-      title: 'System Overview',
-      device: '',
-      sensor: ''
-    },
-    {
-      id: '8',
-      type: 'environmental',
-      title: 'Environmental Sensors',
-      device: 'Chamber A',
-      sensor: 'Humidity'
-    }
+    { id: '1', type: 'temp-chart', title: 'Temperature Trend', device: 'Chamber A', sensor: 'Temperature' },
+    { id: '2', type: 'temp-gauge', title: 'Current Temperature', device: 'Chamber A', sensor: 'Temperature' },
+    { id: '3', type: 'sensor-card', title: 'Product Temperature', device: 'Chamber B', sensor: 'Temperature' },
+    { id: '4', type: 'digital-status', title: 'Digital I/O Status', device: 'Chamber A', sensor: '' },
+    { id: '5', type: 'electrical', title: 'Electrical Monitoring', device: 'Chamber A', sensor: 'Current' },
+    { id: '6', type: 'alarm-panel', title: 'Active Alarms', device: '', sensor: '' },
+    { id: '7', type: 'system-overview', title: 'System Overview', device: '', sensor: '' },
+    { id: '8', type: 'environmental', title: 'Environmental Sensors', device: 'Chamber A', sensor: 'Humidity' }
   ]);
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -765,13 +799,19 @@ export default function Dashboard() {
     setWidgets(widgets.filter(w => w.id !== id));
   };
 
+  const reorderWidgets = (fromIndex, toIndex) => {
+    const newWidgets = [...widgets];
+    const [removed] = newWidgets.splice(fromIndex, 1);
+    newWidgets.splice(toIndex, 0, removed);
+    setWidgets(newWidgets);
+  };
+
   const openSettings = (id) => {
     console.log('Settings for widget:', id);
   };
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -799,7 +839,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Quick Stats */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow-sm border p-4">
@@ -811,7 +850,6 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-          
           <div className="bg-white rounded-lg shadow-sm border p-4">
             <div className="flex items-center">
               <Fan className="w-8 h-8 text-green-600" />
@@ -821,7 +859,6 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-          
           <div className="bg-white rounded-lg shadow-sm border p-4">
             <div className="flex items-center">
               <AlertTriangle className="w-8 h-8 text-orange-600" />
@@ -831,7 +868,6 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-          
           <div className="bg-white rounded-lg shadow-sm border p-4">
             <div className="flex items-center">
               <Zap className="w-8 h-8 text-purple-600" />
@@ -841,7 +877,6 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-          
           <div className="bg-white rounded-lg shadow-sm border p-4">
             <div className="flex items-center">
               <Wrench className="w-8 h-8 text-red-600" />
@@ -853,20 +888,20 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Dashboard Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {widgets.map((widget) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 widget-grid">
+          {widgets.map((widget, index) => (
             <div key={widget.id} className="min-h-[320px]">
-              <WidgetRenderer
+              <DraggableWidget
                 widget={widget}
+                index={index}
                 onRemove={() => removeWidget(widget.id)}
                 onSettings={() => openSettings(widget.id)}
+                onReorder={reorderWidgets}
               />
             </div>
           ))}
         </div>
 
-        {/* Empty State */}
         {widgets.length === 0 && (
           <div className="text-center py-12">
             <Activity className="w-12 h-12 text-gray-400 mx-auto mb-4" />
@@ -883,7 +918,6 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Floating Add Button */}
       {widgets.length > 0 && (
         <button
           onClick={() => setShowAddModal(true)}
@@ -893,7 +927,6 @@ export default function Dashboard() {
         </button>
       )}
 
-      {/* Add Widget Modal */}
       <AddWidgetModal
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
