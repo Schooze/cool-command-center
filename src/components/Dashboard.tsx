@@ -1,5 +1,17 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Plus, X, Settings, Thermometer, Fan, Snowflake, AlertTriangle, Activity, BarChart3, Gauge, TrendingUp, Map, Clock, Wrench, Power, Zap, Droplets, GripVertical } from 'lucide-react';
+// components/Dashboard.tsx
+import React, { useState, useRef } from 'react';
+import { Plus, X, Thermometer, Power, AlertTriangle, Zap, Wrench, Activity, BarChart3, Gauge, Droplets } from 'lucide-react';
+
+// Import all widget components
+import TempChartWidget from './widgets/TempChartWidget';
+import TempGaugeWidget from './widgets/TempGaugeWidget';
+import SensorCardWidget from './widgets/SensorCardWidget';
+import DigitalStatusWidget from './widgets/DigitalStatusWidget';
+import ElectricalWidget from './widgets/ElectricalWidget';
+import AlarmPanelWidget from './widgets/AlarmPanelWidget';
+import SystemOverviewWidget from './widgets/SystemOverviewWidget';
+import EnvironmentalWidget from './widgets/EnvironmentalWidget';
+import WidgetConfigPopup from './widgets/WidgetConfigPopup';
 
 // Mock data untuk simulasi berdasarkan dashboard yang ada
 const mockDevices = [
@@ -22,476 +34,6 @@ const widgetTypes = [
   { id: 'system-overview', name: 'System Overview', icon: Activity, description: 'Overall system status' },
   { id: 'environmental', name: 'Environmental', icon: Droplets, description: 'Humidity and pressure' }
 ];
-
-// Widget Components with drag and drop support
-const TempChartWidget = ({ config, onRemove, onSettings, isDragging, dragHandleProps }) => {
-  const [chartData, setChartData] = useState([]);
-
-  useEffect(() => {
-    const data = Array.from({ length: 24 }, (_, i) => {
-      const baseTemp = -18;
-      const fluctuation = Math.sin(i * Math.PI / 12) * 2;
-      const randomVariation = (Math.random() - 0.5) * 1;
-      return {
-        time: `${i}:00`,
-        value: baseTemp + fluctuation + randomVariation
-      };
-    });
-    setChartData(data);
-
-    const interval = setInterval(() => {
-      setChartData(prev => {
-        const newData = [...prev.slice(1)];
-        const lastTemp = prev[prev.length - 1]?.value || -18;
-        newData.push({
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          value: lastTemp + (Math.random() - 0.5) * 0.5
-        });
-        return newData;
-      });
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <div className={`bg-white rounded-lg shadow-sm border p-4 h-full transition-all duration-200 ${
-      isDragging ? 'shadow-lg ring-2 ring-blue-500 rotate-2 scale-105' : 'hover:shadow-md'
-    }`}>
-      <div className="flex justify-between items-center mb-3">
-        <div className="flex items-center gap-2">
-          <div {...dragHandleProps} className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded">
-            <GripVertical className="w-4 h-4 text-gray-400 pointer-events-none" />
-          </div>
-          <h3 className="font-medium text-gray-900">{config.title}</h3>
-        </div>
-        <div className="flex gap-1">
-          <button onClick={onSettings} className="p-1 hover:bg-gray-100 rounded">
-            <Settings className="w-4 h-4 text-gray-500" />
-          </button>
-          <button onClick={onRemove} className="p-1 hover:bg-gray-100 rounded">
-            <X className="w-4 h-4 text-gray-500" />
-          </button>
-        </div>
-      </div>
-      <div className="h-48">
-        <svg width="100%" height="100%" viewBox="0 0 400 180">
-          <defs>
-            <linearGradient id="tempGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.3"/>
-              <stop offset="100%" stopColor="#3b82f6" stopOpacity="0"/>
-            </linearGradient>
-          </defs>
-          {[0, 45, 90, 135, 180].map(y => (
-            <line key={y} x1="40" y1={y} x2="380" y2={y} stroke="#e5e7eb" strokeWidth="1"/>
-          ))}
-          <polyline
-            fill="none"
-            stroke="#3b82f6"
-            strokeWidth="2"
-            points={chartData.slice(-12).map((point, i) => {
-              const x = 40 + (i * 28);
-              const y = 90 - (point.value + 20) * 2;
-              return `${x},${y}`;
-            }).join(' ')}
-          />
-          <polygon
-            fill="url(#tempGradient)"
-            points={`40,180 ${chartData.slice(-12).map((point, i) => {
-              const x = 40 + (i * 28);
-              const y = 90 - (point.value + 20) * 2;
-              return `${x},${y}`;
-            }).join(' ')} 380,180`}
-          />
-          <text x="30" y="25" fontSize="10" fill="#6b7280" textAnchor="end">-10°C</text>
-          <text x="30" y="70" fontSize="10" fill="#6b7280" textAnchor="end">-15°C</text>
-          <text x="30" y="115" fontSize="10" fill="#6b7280" textAnchor="end">-20°C</text>
-          <text x="30" y="160" fontSize="10" fill="#6b7280" textAnchor="end">-25°C</text>
-        </svg>
-      </div>
-      <div className="mt-2 text-sm text-gray-600">
-        {config.device} - Current: {chartData[chartData.length - 1]?.value.toFixed(1) || 'N/A'}°C
-      </div>
-    </div>
-  );
-};
-
-const TempGaugeWidget = ({ config, onRemove, onSettings, isDragging, dragHandleProps }) => {
-  const [temperature, setTemperature] = useState(-18.5);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTemperature(prev => prev + (Math.random() - 0.5) * 0.2);
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const percentage = Math.max(0, Math.min(100, (temperature + 30) / 40 * 100));
-  
-  return (
-    <div className={`bg-white rounded-lg shadow-sm border p-4 h-full flex flex-col transition-all duration-200 ${
-      isDragging ? 'shadow-lg ring-2 ring-blue-500 rotate-2 scale-105' : 'hover:shadow-md'
-    }`}>
-      <div className="flex justify-between items-center mb-3">
-        <div className="flex items-center gap-2">
-          <div {...dragHandleProps} className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded">
-            <GripVertical className="w-4 h-4 text-gray-400 pointer-events-none" />
-          </div>
-          <h3 className="font-medium text-gray-900">{config.title}</h3>
-        </div>
-        <div className="flex gap-1">
-          <button onClick={onSettings} className="p-1 hover:bg-gray-100 rounded">
-            <Settings className="w-4 h-4 text-gray-500" />
-          </button>
-          <button onClick={onRemove} className="p-1 hover:bg-gray-100 rounded">
-            <X className="w-4 h-4 text-gray-500" />
-          </button>
-        </div>
-      </div>
-      <div className="flex-1 flex items-center justify-center">
-        <div className="relative w-32 h-32">
-          <svg className="w-32 h-32 transform -rotate-90">
-            <circle cx="64" cy="64" r="50" stroke="#e5e7eb" strokeWidth="8" fill="none" />
-            <circle
-              cx="64" cy="64" r="50"
-              stroke={temperature < -20 ? "#3b82f6" : temperature < -15 ? "#f59e0b" : "#ef4444"}
-              strokeWidth="8" fill="none"
-              strokeDasharray={`${percentage * 3.14} 314`}
-              className="transition-all duration-500"
-            />
-          </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-2xl font-bold text-gray-900">{temperature.toFixed(1)}</span>
-            <span className="text-sm text-gray-500">°C</span>
-          </div>
-        </div>
-      </div>
-      <div className="text-center text-sm text-gray-600">{config.device}</div>
-    </div>
-  );
-};
-
-const SensorCardWidget = ({ config, onRemove, onSettings, isDragging, dragHandleProps }) => {
-  const [sensorData, setSensorData] = useState({
-    value: -18.2, status: 'normal', min: -20, max: -10
-  });
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setSensorData(prev => {
-        const newValue = prev.value + (Math.random() - 0.5) * 0.3;
-        const status = newValue > prev.max || newValue < prev.min ? 'alarm' : 
-                      Math.abs(newValue - (prev.max + prev.min) / 2) > (prev.max - prev.min) * 0.3 ? 'warning' : 'normal';
-        return { ...prev, value: newValue, status };
-      });
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const statusColors = {
-    normal: 'bg-green-100 text-green-800',
-    warning: 'bg-yellow-100 text-yellow-800',
-    alarm: 'bg-red-100 text-red-800'
-  };
-  
-  return (
-    <div className={`bg-white rounded-lg shadow-sm border p-4 h-full transition-all duration-200 ${
-      isDragging ? 'shadow-lg ring-2 ring-blue-500 rotate-2 scale-105' : 'hover:shadow-md'
-    }`}>
-      <div className="flex justify-between items-center mb-3">
-        <div className="flex items-center gap-2">
-          <div {...dragHandleProps} className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded">
-            <GripVertical className="w-4 h-4 text-gray-400 pointer-events-none" />
-          </div>
-          <h3 className="font-medium text-gray-900">{config.title}</h3>
-        </div>
-        <div className="flex gap-1">
-          <button onClick={onSettings} className="p-1 hover:bg-gray-100 rounded">
-            <Settings className="w-4 h-4 text-gray-500" />
-          </button>
-          <button onClick={onRemove} className="p-1 hover:bg-gray-100 rounded">
-            <X className="w-4 h-4 text-gray-500" />
-          </button>
-        </div>
-      </div>
-      <div className="flex items-center justify-center flex-1 flex-col space-y-3">
-        <div className="text-center">
-          <div className="text-4xl font-bold text-blue-600">{sensorData.value.toFixed(1)}°C</div>
-          <div className="text-sm text-gray-500 mt-1">{config.device} - {config.sensor}</div>
-        </div>
-        <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusColors[sensorData.status]}`}>
-          {sensorData.status.charAt(0).toUpperCase() + sensorData.status.slice(1)}
-        </div>
-        <div className="text-xs text-gray-500 text-center">Range: {sensorData.min}°C to {sensorData.max}°C</div>
-      </div>
-    </div>
-  );
-};
-
-const DigitalStatusWidget = ({ config, onRemove, onSettings, isDragging, dragHandleProps }) => {
-  const digitalInputs = [
-    { id: 'di1', name: 'Door Switch', active: false },
-    { id: 'di2', name: 'Emergency Stop', active: false },
-    { id: 'di3', name: 'High Pressure', active: false }
-  ];
-
-  const digitalOutputs = [
-    { id: 'do1', name: 'Compressor', active: true },
-    { id: 'do2', name: 'Fan 1', active: true },
-    { id: 'do3', name: 'Fan 2', active: false },
-    { id: 'do4', name: 'Defrost Heater', active: false },
-    { id: 'do5', name: 'Alarm', active: false }
-  ];
-
-  return (
-    <div className={`bg-white rounded-lg shadow-sm border p-4 h-full transition-all duration-200 ${
-      isDragging ? 'shadow-lg ring-2 ring-blue-500 rotate-2 scale-105' : 'hover:shadow-md'
-    }`}>
-      <div className="flex justify-between items-center mb-3">
-        <div className="flex items-center gap-2">
-          <div {...dragHandleProps} className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded">
-            <GripVertical className="w-4 h-4 text-gray-400 pointer-events-none" />
-          </div>
-          <h3 className="font-medium text-gray-900">{config.title}</h3>
-        </div>
-        <div className="flex gap-1">
-          <button onClick={onSettings} className="p-1 hover:bg-gray-100 rounded">
-            <Settings className="w-4 h-4 text-gray-500" />
-          </button>
-          <button onClick={onRemove} className="p-1 hover:bg-gray-100 rounded">
-            <X className="w-4 h-4 text-gray-500" />
-          </button>
-        </div>
-      </div>
-      <div className="space-y-4">
-        <div>
-          <h4 className="font-medium mb-2 text-sm text-gray-700">Digital Inputs</h4>
-          <div className="space-y-2">
-            {digitalInputs.map((input) => (
-              <div key={input.id} className="flex items-center justify-between p-2 rounded bg-gray-50">
-                <span className="text-sm">{input.name}</span>
-                <div className={`h-3 w-3 rounded-full ${input.active ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div>
-          <h4 className="font-medium mb-2 text-sm text-gray-700">Digital Outputs</h4>
-          <div className="space-y-2">
-            {digitalOutputs.map((output) => (
-              <div key={output.id} className="flex items-center justify-between p-2 rounded bg-gray-50">
-                <span className="text-sm">{output.name}</span>
-                <div className={`h-3 w-3 rounded-full ${output.active ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const ElectricalWidget = ({ config, onRemove, onSettings, isDragging, dragHandleProps }) => {
-  const [electrical, setElectrical] = useState([
-    { id: 'current', name: 'Current', value: 8.5, unit: 'A', min: 0, max: 15 },
-    { id: 'voltage', name: 'Voltage', value: 230.2, unit: 'V', min: 200, max: 250 }
-  ]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setElectrical(prev => prev.map(item => ({
-        ...item,
-        value: item.value + (Math.random() - 0.5) * 0.5
-      })));
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <div className={`bg-white rounded-lg shadow-sm border p-4 h-full transition-all duration-200 ${
-      isDragging ? 'shadow-lg ring-2 ring-blue-500 rotate-2 scale-105' : 'hover:shadow-md'
-    }`}>
-      <div className="flex justify-between items-center mb-3">
-        <div className="flex items-center gap-2">
-          <div {...dragHandleProps} className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded">
-            <GripVertical className="w-4 h-4 text-gray-400 pointer-events-none" />
-          </div>
-          <h3 className="font-medium text-gray-900">{config.title}</h3>
-        </div>
-        <div className="flex gap-1">
-          <button onClick={onSettings} className="p-1 hover:bg-gray-100 rounded">
-            <Settings className="w-4 h-4 text-gray-500" />
-          </button>
-          <button onClick={onRemove} className="p-1 hover:bg-gray-100 rounded">
-            <X className="w-4 h-4 text-gray-500" />
-          </button>
-        </div>
-      </div>
-      <div className="space-y-4">
-        {electrical.map((item) => (
-          <div key={item.id} className="flex items-center justify-between p-3 border rounded">
-            <div>
-              <div className="font-medium">{item.name}</div>
-              <div className="text-xs text-gray-500">{item.min}-{item.max}{item.unit}</div>
-            </div>
-            <div className="text-right">
-              <div className="text-lg font-bold">{item.value.toFixed(1)}{item.unit}</div>
-              <div className="text-xs text-green-600">Normal</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-const AlarmPanelWidget = ({ config, onRemove, onSettings, isDragging, dragHandleProps }) => {
-  const alarms = [
-    { type: 'High Temperature', device: 'Chamber A', time: '2 min ago', severity: 'high' },
-    { type: 'Door Open', device: 'Chamber B', time: '5 min ago', severity: 'medium' },
-    { type: 'Maintenance Due', device: 'Chamber C', time: '1 hour ago', severity: 'low' }
-  ];
-
-  return (
-    <div className={`bg-white rounded-lg shadow-sm border p-4 h-full transition-all duration-200 ${
-      isDragging ? 'shadow-lg ring-2 ring-blue-500 rotate-2 scale-105' : 'hover:shadow-md'
-    }`}>
-      <div className="flex justify-between items-center mb-3">
-        <div className="flex items-center gap-2">
-          <div {...dragHandleProps} className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded">
-            <GripVertical className="w-4 h-4 text-gray-400 pointer-events-none" />
-          </div>
-          <h3 className="font-medium text-gray-900">{config.title}</h3>
-        </div>
-        <div className="flex gap-1">
-          <button onClick={onSettings} className="p-1 hover:bg-gray-100 rounded">
-            <Settings className="w-4 h-4 text-gray-500" />
-          </button>
-          <button onClick={onRemove} className="p-1 hover:bg-gray-100 rounded">
-            <X className="w-4 h-4 text-gray-500" />
-          </button>
-        </div>
-      </div>
-      <div className="space-y-2 max-h-48 overflow-y-auto">
-        {alarms.map((alarm, i) => (
-          <div key={i} className="flex items-center space-x-3 p-3 rounded-lg bg-gray-50 border-l-4 border-l-red-500">
-            <AlertTriangle className={`w-5 h-5 ${
-              alarm.severity === 'high' ? 'text-red-500' : 
-              alarm.severity === 'medium' ? 'text-orange-500' : 'text-yellow-500'
-            }`} />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900">{alarm.type}</p>
-              <p className="text-xs text-gray-500">{alarm.device} • {alarm.time}</p>
-            </div>
-            <div className={`px-2 py-1 rounded text-xs font-medium ${
-              alarm.severity === 'high' ? 'bg-red-100 text-red-800' :
-              alarm.severity === 'medium' ? 'bg-orange-100 text-orange-800' : 'bg-yellow-100 text-yellow-800'
-            }`}>
-              {alarm.severity}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-const SystemOverviewWidget = ({ config, onRemove, onSettings, isDragging, dragHandleProps }) => {
-  return (
-    <div className={`bg-white rounded-lg shadow-sm border p-4 h-full transition-all duration-200 ${
-      isDragging ? 'shadow-lg ring-2 ring-blue-500 rotate-2 scale-105' : 'hover:shadow-md'
-    }`}>
-      <div className="flex justify-between items-center mb-3">
-        <div className="flex items-center gap-2">
-          <div {...dragHandleProps} className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded">
-            <GripVertical className="w-4 h-4 text-gray-400 pointer-events-none" />
-          </div>
-          <h3 className="font-medium text-gray-900">{config.title}</h3>
-        </div>
-        <div className="flex gap-1">
-          <button onClick={onSettings} className="p-1 hover:bg-gray-100 rounded">
-            <Settings className="w-4 h-4 text-gray-500" />
-          </button>
-          <button onClick={onRemove} className="p-1 hover:bg-gray-100 rounded">
-            <X className="w-4 h-4 text-gray-500" />
-          </button>
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="text-center p-3 bg-green-50 rounded-lg">
-          <div className="text-2xl font-bold text-green-600">3</div>
-          <div className="text-sm text-gray-600">Units Online</div>
-        </div>
-        <div className="text-center p-3 bg-blue-50 rounded-lg">
-          <div className="text-2xl font-bold text-blue-600">-18.2°C</div>
-          <div className="text-sm text-gray-600">Avg Temperature</div>
-        </div>
-        <div className="text-center p-3 bg-orange-50 rounded-lg">
-          <div className="text-2xl font-bold text-orange-600">2</div>
-          <div className="text-sm text-gray-600">Active Alarms</div>
-        </div>
-        <div className="text-center p-3 bg-purple-50 rounded-lg">
-          <div className="text-2xl font-bold text-purple-600">95%</div>
-          <div className="text-sm text-gray-600">System Health</div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const EnvironmentalWidget = ({ config, onRemove, onSettings, isDragging, dragHandleProps }) => {
-  const [envData, setEnvData] = useState([
-    { id: 'humidity', name: 'Humidity', value: 65.2, unit: '%', min: 40, max: 80 },
-    { id: 'pressure', name: 'Pressure', value: 1013.2, unit: 'hPa', min: 950, max: 1050 }
-  ]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setEnvData(prev => prev.map(item => ({
-        ...item,
-        value: item.value + (Math.random() - 0.5) * 0.5
-      })));
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <div className={`bg-white rounded-lg shadow-sm border p-4 h-full transition-all duration-200 ${
-      isDragging ? 'shadow-lg ring-2 ring-blue-500 rotate-2 scale-105' : 'hover:shadow-md'
-    }`}>
-      <div className="flex justify-between items-center mb-3">
-        <div className="flex items-center gap-2">
-          <div {...dragHandleProps} className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded">
-            <GripVertical className="w-4 h-4 text-gray-400 pointer-events-none" />
-          </div>
-          <h3 className="font-medium text-gray-900">{config.title}</h3>
-        </div>
-        <div className="flex gap-1">
-          <button onClick={onSettings} className="p-1 hover:bg-gray-100 rounded">
-            <Settings className="w-4 h-4 text-gray-500" />
-          </button>
-          <button onClick={onRemove} className="p-1 hover:bg-gray-100 rounded">
-            <X className="w-4 h-4 text-gray-500" />
-          </button>
-        </div>
-      </div>
-      <div className="space-y-4">
-        {envData.map((item) => (
-          <div key={item.id} className="flex items-center justify-between p-3 border rounded">
-            <div>
-              <div className="font-medium">{item.name}</div>
-              <div className="text-xs text-gray-500">{item.min}-{item.max}{item.unit}</div>
-            </div>
-            <div className="text-right">
-              <div className="text-lg font-bold">{item.value.toFixed(1)}{item.unit}</div>
-              <div className="text-xs text-green-600">Normal</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
 
 // Drag and Drop Implementation - Simplified
 const DraggableWidget = ({ widget, index, onRemove, onSettings, onReorder }) => {
@@ -790,6 +332,8 @@ export default function Dashboard() {
   ]);
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showConfigPopup, setShowConfigPopup] = useState(false);
+  const [selectedWidget, setSelectedWidget] = useState(null);
 
   const addWidget = (widget) => {
     setWidgets([...widgets, widget]);
@@ -807,7 +351,9 @@ export default function Dashboard() {
   };
 
   const openSettings = (id) => {
-    console.log('Settings for widget:', id);
+    const widget = widgets.find(w => w.id === id);
+    setSelectedWidget(widget);
+    setShowConfigPopup(true);
   };
 
   return (
@@ -816,7 +362,6 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-3">
-              <Snowflake className="w-8 h-8 text-blue-600" />
               <div>
                 <h1 className="text-xl font-bold text-gray-900">Koronka Cooling System</h1>
                 <p className="text-sm text-gray-600">IoT Dashboard - Meat Processing Control</p>
@@ -852,7 +397,7 @@ export default function Dashboard() {
           </div>
           <div className="bg-white rounded-lg shadow-sm border p-4">
             <div className="flex items-center">
-              <Fan className="w-8 h-8 text-green-600" />
+              <Power className="w-8 h-8 text-green-600" />
               <div className="ml-3">
                 <p className="text-sm font-medium text-gray-600">Active Units</p>
                 <p className="text-2xl font-bold text-gray-900">3/3</p>
@@ -931,6 +476,12 @@ export default function Dashboard() {
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         onAdd={addWidget}
+      />
+
+      <WidgetConfigPopup
+        isOpen={showConfigPopup}
+        onClose={() => setShowConfigPopup(false)}
+        widget={selectedWidget}
       />
     </div>
   );

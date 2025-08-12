@@ -6,8 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Settings, Snowflake, RotateCcw, Save, Clock, Thermometer, Timer } from 'lucide-react';
+import { Settings, Snowflake, RotateCcw, Save, Clock, Thermometer, Timer, Package } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Area, ComposedChart } from 'recharts';
+
 // Simulated toast hook for demo
 const useToast = () => ({
   toast: ({ title, description }: { title: string; description: string }) => {
@@ -194,11 +195,65 @@ interface CycleStatus {
   totalCycleTime: number; // minutes
 }
 
+interface ConnectedDevice {
+  id: string;
+  serialNumber: string;
+  name: string;
+  productType: string;
+  location: string;
+  status: 'online' | 'offline';
+  temperature: number;
+}
+
 const Configuration = () => {
   const { toast } = useToast();
   const [autoModeEnabled, setAutoModeEnabled] = useState(true);
   const [defrostActive, setDefrostActive] = useState(false);
   const [freezeActive, setFreezeActive] = useState(false);
+
+  // Mock data untuk connected devices berdasarkan database schema
+  const [connectedDevices] = useState<ConnectedDevice[]>([
+    {
+      id: 'uuid-1',
+      serialNumber: 'KRN-FRZ-001',
+      name: 'Cold Storage Unit 1',
+      productType: 'Blast Freezer',
+      location: 'Warehouse A',
+      status: 'online',
+      temperature: -16.5
+    },
+    {
+      id: 'uuid-2', 
+      serialNumber: 'KRN-FRZ-002',
+      name: 'Cold Storage Unit 2',
+      productType: 'Display Freezer',
+      location: 'Warehouse B',
+      status: 'online',
+      temperature: -18.2
+    },
+    {
+      id: 'uuid-3',
+      serialNumber: 'KRN-FRZ-003', 
+      name: 'Cold Storage Unit 3',
+      productType: 'Blast Freezer',
+      location: 'Production Floor',
+      status: 'offline',
+      temperature: -15.8
+    },
+    {
+      id: 'uuid-4',
+      serialNumber: 'KRN-FRZ-004',
+      name: 'Cold Storage Unit 4', 
+      productType: 'Walk-in Freezer',
+      location: 'Storage Room C',
+      status: 'online',
+      temperature: -17.1
+    }
+  ]);
+
+  // Selected device state
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>(connectedDevices[0]?.id || '');
+  const selectedDevice = connectedDevices.find(device => device.id === selectedDeviceId);
 
   // Auto mode cycle configuration
   const [autoModeConfig, setAutoModeConfig] = useState<AutoModeConfig>({
@@ -217,9 +272,16 @@ const Configuration = () => {
     totalCycleTime: 270 // total cycle time (freezing + defrost)
   });
 
-  // Simulate current temperature and time
-  const [currentTemp, setCurrentTemp] = useState(-16.5);
+  // Simulate current temperature and time - now based on selected device
+  const [currentTemp, setCurrentTemp] = useState(selectedDevice?.temperature || -16.5);
   const [currentTime, setCurrentTime] = useState(420); // 7:00 AM (420 minutes from 6:00 AM)
+
+  // Update temperature when device changes
+  useEffect(() => {
+    if (selectedDevice) {
+      setCurrentTemp(selectedDevice.temperature);
+    }
+  }, [selectedDevice]);
 
   const [parameters, setParameters] = useState<Parameter[]>([
     { id: 'f01', code: 'F01', name: 'Temperature setpoint', value: -18.0, unit: '°C', min: -30, max: 10, description: 'Target temperature for the cooling system' },
@@ -297,7 +359,7 @@ const Configuration = () => {
   const saveConfiguration = () => {
     toast({
       title: "Configuration Saved",
-      description: "All parameters have been updated successfully.",
+      description: `Configuration saved for ${selectedDevice?.name || 'selected device'}.`,
     });
   };
 
@@ -312,7 +374,7 @@ const Configuration = () => {
     setDefrostActive(true);
     toast({
       title: "Manual Defrost Started",
-      description: "Defrost cycle has been initiated manually.",
+      description: `Defrost cycle initiated for ${selectedDevice?.name || 'selected device'}.`,
     });
     
     // Simulate defrost completion after 5 seconds for demo
@@ -329,7 +391,7 @@ const Configuration = () => {
     setFreezeActive(true);
     toast({
       title: "Manual Freezing Started",
-      description: "Freezing cycle has been initiated manually.",
+      description: `Freezing cycle initiated for ${selectedDevice?.name || 'selected device'}.`,
     });
 
     // Simulate freezing completion after 5 seconds for demo
@@ -353,15 +415,36 @@ const Configuration = () => {
       <div className="mx-auto max-w-8xl space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-foreground">System Configuration</h1>
-          <div className="flex gap-2">
-            <Button onClick={resetToDefaults} variant="outline">
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Reset Defaults
-            </Button>
-            <Button onClick={saveConfiguration}>
-              <Save className="h-4 w-4 mr-2" />
-              Save Configuration
-            </Button>
+          <div className="flex items-center gap-4">
+            {/* Device Selection Dropdown */}
+            <div className="flex items-center gap-2">
+              <Package className="h-4 w-4 text-muted-foreground" />
+              <Label htmlFor="device-select" className="text-sm text-muted-foreground">
+                Device:
+              </Label>
+              <select
+                id="device-select"
+                value={selectedDeviceId}
+                onChange={(e) => setSelectedDeviceId(e.target.value)}
+                className="min-w-[200px] px-3 py-2 text-sm border border-input bg-background rounded-md focus:ring-2 focus:ring-ring focus:border-transparent"
+              >
+                {connectedDevices.map((device) => (
+                  <option key={device.id} value={device.id}>
+                    {device.name} ({device.serialNumber})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={resetToDefaults} variant="outline">
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Reset Defaults
+              </Button>
+              <Button onClick={saveConfiguration}>
+                <Save className="h-4 w-4 mr-2" />
+                Save Configuration
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -373,6 +456,23 @@ const Configuration = () => {
                 <Timer className="h-5 w-5" />
                 Current Auto Cycle Status
               </CardTitle>
+              {/* Device Status Info */}
+              {selectedDevice && (
+                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${
+                      selectedDevice.status === 'online' ? 'bg-green-500' : 'bg-red-500'
+                    }`}></div>
+                    <span className="capitalize">{selectedDevice.status}</span>
+                  </div>
+                  <span>•</span>
+                  <span>{selectedDevice.productType}</span>
+                  <span>•</span>
+                  <span>{selectedDevice.location}</span>
+                  <span>•</span>
+                  <span>Current: {selectedDevice.temperature.toFixed(1)}°C</span>
+                </div>
+              )}
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -437,7 +537,7 @@ const Configuration = () => {
               <div className="flex flex-col items-center space-y-2">
                 <Button 
                   onClick={startManualDefrost}
-                  disabled={defrostActive}
+                  disabled={defrostActive || selectedDevice?.status === 'offline'}
                   variant={defrostActive ? "secondary" : "default"}
                   className="w-full h-16 text-lg"
                 >
@@ -449,12 +549,17 @@ const Configuration = () => {
                     Defrosting
                   </Badge>
                 )}
+                {selectedDevice?.status === 'offline' && (
+                  <Badge variant="destructive" className="text-xs">
+                    Device Offline
+                  </Badge>
+                )}
               </div>
 
               <div className="flex flex-col items-center space-y-2">
                 <Button 
                   onClick={startManualFreezing}
-                  disabled={freezeActive}
+                  disabled={freezeActive || selectedDevice?.status === 'offline'}
                   variant={freezeActive ? "secondary" : "default"}
                   className="w-full h-16 text-lg"
                 >
@@ -464,6 +569,11 @@ const Configuration = () => {
                 {freezeActive && (
                   <Badge variant="secondary" className="animate-pulse">
                     Freezing
+                  </Badge>
+                )}
+                {selectedDevice?.status === 'offline' && (
+                  <Badge variant="destructive" className="text-xs">
+                    Device Offline
                   </Badge>
                 )}
               </div>
