@@ -4,13 +4,169 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Settings, Snowflake, LayoutDashboard, RotateCcw, Save, Clock, Thermometer, Timer } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { useNavigate } from 'react-router-dom';
-import CycleGraph from './CycleGraph';
+import { Settings, Snowflake, RotateCcw, Save, Clock, Thermometer, Timer } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Area, ComposedChart } from 'recharts';
+// Simulated toast hook for demo
+const useToast = () => ({
+  toast: ({ title, description }: { title: string; description: string }) => {
+    console.log(`Toast: ${title} - ${description}`);
+    // In real app, this would show actual toast notification
+  }
+});
+
+// CycleGraph component with real chart visualization
+const CycleGraph = ({ freezingTime, defrostTime, targetTempFreezing, targetTempDefrost, currentTime, currentTemp, currentMode }: any) => {
+  // Generate 24-hour data points (every 15 minutes = 96 points)
+  const generateCycleData = () => {
+    const data = [];
+    const totalCycleTime = freezingTime + defrostTime;
+    let currentCycleTime = 0;
+    let isFreezingMode = true;
+    
+    for (let minute = 0; minute < 1440; minute += 15) { // Every 15 minutes
+      const hour = Math.floor(minute / 60);
+      const min = minute % 60;
+      const timeLabel = `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`;
+      
+      // Determine current mode in cycle
+      if (currentCycleTime >= (isFreezingMode ? freezingTime : defrostTime)) {
+        isFreezingMode = !isFreezingMode;
+        currentCycleTime = 0;
+      }
+      
+      // Calculate target temperature based on mode
+      const targetTemp = isFreezingMode ? targetTempFreezing : targetTempDefrost;
+      
+      // Add some realistic temperature variation
+      const tempVariation = Math.sin((minute / 60) * 0.5) * 1 + (Math.random() - 0.5) * 0.8;
+      const temperature = targetTemp + tempVariation;
+      
+      data.push({
+        time: minute,
+        timeLabel,
+        temperature: Math.round(temperature * 10) / 10,
+        targetTemp: targetTemp,
+        mode: isFreezingMode ? 'Freezing' : 'Defrost',
+        isCurrent: Math.abs(minute - currentTime) < 15, // Highlight current time window
+        modeValue: isFreezingMode ? -20 : 10 // For area chart
+      });
+      
+      currentCycleTime += 15;
+    }
+    
+    return data;
+  };
+
+  const chartData = generateCycleData();
+  
+  // Custom tooltip component
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-background border rounded-lg p-3 shadow-lg">
+          <p className="font-medium">{data.timeLabel}</p>
+          <p className="text-sm">
+            <span className="text-blue-600">Temperature: {data.temperature}°C</span>
+          </p>
+          <p className="text-sm">
+            <span className="text-gray-600">Target: {data.targetTemp}°C</span>
+          </p>
+          <p className="text-sm">
+            <span className={`${data.mode === 'Freezing' ? 'text-blue-600' : 'text-orange-600'}`}>
+              Mode: {data.mode}
+            </span>
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <div className="h-80 w-full">
+      <div className="mb-4 flex items-center justify-between">
+        <h4 className="font-medium">24-Hour Temperature Cycle</h4>
+        <div className="flex items-center gap-4 text-sm">
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 bg-blue-500 rounded"></div>
+            <span>Actual Temp</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 bg-yellow-500 rounded"></div>
+            <span>Target Temp</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 bg-blue-100 rounded"></div>
+            <span>Freezing</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 bg-orange-100 rounded"></div>
+            <span>Defrost</span>
+          </div>
+        </div>
+      </div>
+      <div className="mt-2 text-xs text-muted-foreground text-center">
+        Current: {currentTemp.toFixed(1)}°C • Mode: {currentMode} • Time: {Math.floor(currentTime / 60).toString().padStart(2, '0')}:{(currentTime % 60).toString().padStart(2, '0')}
+      </div>
+      <ResponsiveContainer width="100%" height="100%">
+        <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+          <XAxis 
+            dataKey="timeLabel"
+            interval={Math.floor(chartData.length / 12)} // Show ~12 labels
+            fontSize={12}
+            stroke="#666"
+          />
+          <YAxis 
+            domain={[-25, 15]}
+            fontSize={12}
+            stroke="#666"
+            label={{ value: 'Temperature (°C)', angle: -90, position: 'insideLeft' }}
+          />
+          <Tooltip content={<CustomTooltip />} />
+          
+          {/* Target temperature line */}
+          <Line
+            type="stepAfter"
+            dataKey="targetTemp"
+            stroke="#eab308"
+            strokeWidth={2}
+            strokeDasharray="5 5"
+            dot={false}
+            name="Target Temperature"
+          />
+          
+          {/* Actual temperature line */}
+          <Line
+            type="monotone"
+            dataKey="temperature"
+            stroke="#3b82f6"
+            strokeWidth={2}
+            dot={(props: any) => {
+              if (props.payload.isCurrent) {
+                return <circle cx={props.cx} cy={props.cy} r={4} fill="#ef4444" stroke="#fff" strokeWidth={2} />;
+              }
+              return null;
+            }}
+            name="Actual Temperature"
+          />
+          
+          {/* Current time indicator */}
+          <ReferenceLine 
+            x={chartData.find(d => d.isCurrent)?.timeLabel || chartData[Math.floor(currentTime / 15)]?.timeLabel} 
+            stroke="#ef4444" 
+            strokeWidth={2}
+            strokeDasharray="3 3"
+            label={{ value: "Now", position: "top", fill: "#ef4444", fontSize: 12 }}
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
 
 interface Parameter {
   id: string;
@@ -39,13 +195,10 @@ interface CycleStatus {
 }
 
 const Configuration = () => {
-  const navigate = useNavigate();
   const { toast } = useToast();
-  const [mode, setMode] = useState<'auto' | 'defrost'>('auto');
   const [autoModeEnabled, setAutoModeEnabled] = useState(true);
   const [defrostActive, setDefrostActive] = useState(false);
   const [freezeActive, setFreezeActive] = useState(false);
-
 
   // Auto mode cycle configuration
   const [autoModeConfig, setAutoModeConfig] = useState<AutoModeConfig>({
@@ -154,6 +307,7 @@ const Configuration = () => {
       description: "All parameters have been reset to factory defaults.",
     });
   };
+
   const startManualDefrost = () => {
     setDefrostActive(true);
     toast({
@@ -170,6 +324,7 @@ const Configuration = () => {
       });
     }, 5000);
   };
+
   const startManualFreezing = () => {
     setFreezeActive(true);
     toast({
@@ -210,348 +365,331 @@ const Configuration = () => {
           </div>
         </div>
 
-        <Tabs value={mode} onValueChange={(value) => setMode(value as 'auto' | 'defrost')}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="auto" className="flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              Auto Mode Configuration
-            </TabsTrigger>
-            <TabsTrigger value="defrost" className="flex items-center gap-2">
-              <Snowflake className="h-4 w-4" />
-              Manual Mode Configuration
-            </TabsTrigger>
-          </TabsList>
+        {/* Current Auto Cycle Status */}
+        {autoModeEnabled && autoModeConfig.cycleEnabled && (
+          <Card className="border-primary/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Timer className="h-5 w-5" />
+                Current Auto Cycle Status
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div className="flex items-center space-x-3">
+                  <div className={`h-4 w-4 rounded-full ${
+                    cycleStatus.currentMode === 'freezing' ? 'bg-info animate-pulse' : 
+                    cycleStatus.currentMode === 'defrost' ? 'bg-warning animate-pulse' : 'bg-muted'
+                  }`}></div>
+                  <div>
+                    <div className="text-sm text-muted-foreground">Current Mode</div>
+                    <div className="font-semibold capitalize">{cycleStatus.currentMode}</div>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm text-muted-foreground">Time Remaining</div>
+                  <div className="font-semibold">{formatTime(cycleStatus.timeRemaining)}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-muted-foreground">Target Temperature</div>
+                  <div className="font-semibold">
+                    {cycleStatus.currentMode === 'freezing' 
+                      ? `${autoModeConfig.targetTempFreezing}°C` 
+                      : `${autoModeConfig.targetTempDefrost}°C`
+                    }
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2 mb-6">
+                <div className="flex justify-between text-sm">
+                  <span>Cycle Progress</span>
+                  <span>{cycleStatus.cycleProgress.toFixed(1)}%</span>
+                </div>
+                <Progress value={cycleStatus.cycleProgress} className="h-2" />
+              </div>
+              
+              {/* 24-Hour Cycle Graph */}
+              <div className="space-y-4">
+                <CycleGraph
+                  freezingTime={autoModeConfig.freezingWindowTime}
+                  defrostTime={autoModeConfig.defrostWindowTime}
+                  targetTempFreezing={autoModeConfig.targetTempFreezing}
+                  targetTempDefrost={autoModeConfig.targetTempDefrost}
+                  currentTime={currentTime}
+                  currentTemp={currentTemp}
+                  currentMode={cycleStatus.currentMode}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-          {/* Auto Mode Configuration */}
-          <TabsContent value="auto" className="space-y-6">
-            {/* Cycle Status Display */}
-            {autoModeEnabled && autoModeConfig.cycleEnabled && (
-              <Card className="border-primary/20">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Timer className="h-5 w-5" />
-                    Current Auto Cycle Status
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <div className="flex items-center space-x-3">
-                      <div className={`h-4 w-4 rounded-full ${
-                        cycleStatus.currentMode === 'freezing' ? 'bg-info animate-pulse' : 
-                        cycleStatus.currentMode === 'defrost' ? 'bg-warning animate-pulse' : 'bg-muted'
-                      }`}></div>
-                      <div>
-                        <div className="text-sm text-muted-foreground">Current Mode</div>
-                        <div className="font-semibold capitalize">{cycleStatus.currentMode}</div>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-muted-foreground">Time Remaining</div>
-                      <div className="font-semibold">{formatTime(cycleStatus.timeRemaining)}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-muted-foreground">Target Temperature</div>
-                      <div className="font-semibold">
-                        {cycleStatus.currentMode === 'freezing' 
-                          ? `${autoModeConfig.targetTempFreezing}°C` 
-                          : `${autoModeConfig.targetTempDefrost}°C`
-                        }
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-2 mb-6">
-                    <div className="flex justify-between text-sm">
-                      <span>Cycle Progress</span>
-                      <span>{cycleStatus.cycleProgress.toFixed(1)}%</span>
-                    </div>
-                    <Progress value={cycleStatus.cycleProgress} className="h-2" />
-                  </div>
-                  
-                  {/* 24-Hour Cycle Graph */}
-                  <CycleGraph
-                    freezingTime={autoModeConfig.freezingWindowTime}
-                    defrostTime={autoModeConfig.defrostWindowTime}
-                    targetTempFreezing={autoModeConfig.targetTempFreezing}
-                    targetTempDefrost={autoModeConfig.targetTempDefrost}
-                    currentTime={currentTime}
-                    currentTemp={currentTemp}
-                    currentMode={cycleStatus.currentMode}
-                  />
-                </CardContent>
-              </Card>
-            )}
+        {/* Manual Control Buttons */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Manual Controls
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col items-center space-y-2">
+                <Button 
+                  onClick={startManualDefrost}
+                  disabled={defrostActive}
+                  variant={defrostActive ? "secondary" : "default"}
+                  className="w-full h-16 text-lg"
+                >
+                  <Snowflake className="h-6 w-6 mr-3" />
+                  {defrostActive ? "Defrost Active..." : "Start Defrost"}
+                </Button>
+                {defrostActive && (
+                  <Badge variant="secondary" className="animate-pulse">
+                    Defrosting
+                  </Badge>
+                )}
+              </div>
 
-            {/* Auto Mode Cycle Configuration */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-5 w-5" />
-                    Cycle Window Configuration
-                  </div>
+              <div className="flex flex-col items-center space-y-2">
+                <Button 
+                  onClick={startManualFreezing}
+                  disabled={freezeActive}
+                  variant={freezeActive ? "secondary" : "default"}
+                  className="w-full h-16 text-lg"
+                >
+                  <Thermometer className="h-6 w-6 mr-3" />
+                  {freezeActive ? "Freezing Active..." : "Start Freeze"}
+                </Button>
+                {freezeActive && (
+                  <Badge variant="secondary" className="animate-pulse">
+                    Freezing
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Cycle Window Configuration */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Cycle Window Configuration
+              </div>
+              <div className="flex items-center space-x-2">
+                <Label htmlFor="cycle-enabled">Enable Auto Cycle</Label>
+                <Switch
+                  id="cycle-enabled"
+                  checked={autoModeConfig.cycleEnabled}
+                  onCheckedChange={(checked) => updateAutoModeConfig('cycleEnabled', checked)}
+                />
+              </div>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <h4 className="font-medium flex items-center gap-2">
+                  <Thermometer className="h-4 w-4 text-info" />
+                  Freezing Mode Settings
+                </h4>
+                <div className="space-y-2">
+                  <Label htmlFor="freezing-time">Freezing Window Time</Label>
                   <div className="flex items-center space-x-2">
-                    <Label htmlFor="cycle-enabled">Enable Auto Cycle</Label>
-                    <Switch
-                      id="cycle-enabled"
-                      checked={autoModeConfig.cycleEnabled}
-                      onCheckedChange={(checked) => updateAutoModeConfig('cycleEnabled', checked)}
+                    <Input
+                      id="freezing-time"
+                      type="number"
+                      value={autoModeConfig.freezingWindowTime}
+                      onChange={(e) => updateAutoModeConfig('freezingWindowTime', parseInt(e.target.value) || 0)}
+                      min={30}
+                      max={1440}
+                      className="w-24"
                     />
+                    <span className="text-sm text-muted-foreground">minutes</span>
                   </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <h4 className="font-medium flex items-center gap-2">
-                      <Thermometer className="h-4 w-4 text-info" />
-                      Freezing Mode Settings
-                    </h4>
-                    <div className="space-y-2">
-                      <Label htmlFor="freezing-time">Freezing Window Time</Label>
-                      <div className="flex items-center space-x-2">
-                        <Input
-                          id="freezing-time"
-                          type="number"
-                          value={autoModeConfig.freezingWindowTime}
-                          onChange={(e) => updateAutoModeConfig('freezingWindowTime', parseInt(e.target.value) || 0)}
-                          min={30}
-                          max={1440}
-                          className="w-24"
-                        />
-                        <span className="text-sm text-muted-foreground">minutes</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Duration of freezing cycle (30-1440 min)</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="freezing-temp">Target Temperature (Freezing)</Label>
-                      <div className="flex items-center space-x-2">
-                        <Input
-                          id="freezing-temp"
-                          type="number"
-                          value={autoModeConfig.targetTempFreezing}
-                          onChange={(e) => updateAutoModeConfig('targetTempFreezing', parseFloat(e.target.value) || 0)}
-                          step={0.1}
-                          min={-30}
-                          max={0}
-                          className="w-24"
-                        />
-                        <span className="text-sm text-muted-foreground">°C</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Target temperature during freezing mode</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h4 className="font-medium flex items-center gap-2">
-                      <Snowflake className="h-4 w-4 text-warning" />
-                      Defrost Mode Settings
-                    </h4>
-                    <div className="space-y-2">
-                      <Label htmlFor="defrost-time">Defrost Window Time</Label>
-                      <div className="flex items-center space-x-2">
-                        <Input
-                          id="defrost-time"
-                          type="number"
-                          value={autoModeConfig.defrostWindowTime}
-                          onChange={(e) => updateAutoModeConfig('defrostWindowTime', parseInt(e.target.value) || 0)}
-                          min={5}
-                          max={120}
-                          className="w-24"
-                        />
-                        <span className="text-sm text-muted-foreground">minutes</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Duration of defrost cycle (5-120 min)</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="defrost-temp">Target Temperature (Defrost)</Label>
-                      <div className="flex items-center space-x-2">
-                        <Input
-                          id="defrost-temp"
-                          type="number"
-                          value={autoModeConfig.targetTempDefrost}
-                          onChange={(e) => updateAutoModeConfig('targetTempDefrost', parseFloat(e.target.value) || 0)}
-                          step={0.1}
-                          min={0}
-                          max={20}
-                          className="w-24"
-                        />
-                        <span className="text-sm text-muted-foreground">°C</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Target temperature during defrost mode</p>
-                    </div>
-                  </div>
+                  <p className="text-xs text-muted-foreground">Duration of freezing cycle (30-1440 min)</p>
                 </div>
-
-                {/* Cycle Summary */}
-                <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-                  <h5 className="font-medium mb-2">Cycle Summary</h5>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Total Cycle Time:</span>
-                      <div className="font-medium">
-                        {formatTime(autoModeConfig.freezingWindowTime + autoModeConfig.defrostWindowTime)}
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Freezing Ratio:</span>
-                      <div className="font-medium">
-                        {(autoModeConfig.freezingWindowTime / (autoModeConfig.freezingWindowTime + autoModeConfig.defrostWindowTime) * 100).toFixed(1)}%
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Daily Cycles:</span>
-                      <div className="font-medium">
-                        {(1440 / (autoModeConfig.freezingWindowTime + autoModeConfig.defrostWindowTime)).toFixed(1)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-          </TabsContent>
-
-          {/* Manual Mode Configuration */}
-          <TabsContent value="defrost" className="space-y-6">
-            {/* Standard Parameters */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Settings className="h-5 w-5" />
-                    Standard Parameters
-                  </div>
-
+                <div className="space-y-2">
+                  <Label htmlFor="freezing-temp">Target Temperature (Freezing)</Label>
                   <div className="flex items-center space-x-2">
-                    <Button 
-                      onClick={startManualFreezing}
-                      disabled={freezeActive}
-                      variant={freezeActive ? "secondary" : "default"}
-                    >
-                      <Snowflake className="h-4 w-4 mr-2" />
-                      {freezeActive ? "Freezing Active..." : "Start Manual Freezing"}
-                    </Button>
-                    {freezeActive && (
-                      <Badge variant="secondary" className="animate-pulse">
-                        Freezing
-                      </Badge>
-                    )}
-                  </div>
-
-                  {/* <div className="flex items-center space-x-2">
-                    <Label htmlFor="auto-mode">Auto Mode</Label>
-                    <Switch
-                      id="auto-mode"
-                      checked={autoModeEnabled}
-                      onCheckedChange={setAutoModeEnabled}
+                    <Input
+                      id="freezing-temp"
+                      type="number"
+                      value={autoModeConfig.targetTempFreezing}
+                      onChange={(e) => updateAutoModeConfig('targetTempFreezing', parseFloat(e.target.value) || 0)}
+                      step={0.1}
+                      min={-30}
+                      max={0}
+                      className="w-24"
                     />
-                    <Badge variant={autoModeEnabled ? "default" : "secondary"}>
-                      {autoModeEnabled ? "Enabled" : "Disabled"}
-                    </Badge>
-                  </div> */}
-                  
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {parameters.slice(0, 6).map((param) => (
-                    <div key={param.id} className="space-y-2">
-                      <Label htmlFor={param.id} className="text-sm font-medium">
-                        {param.code} - {param.name}
-                      </Label>
-                      <div className="flex items-center space-x-2">
-                        <Input
-                          id={param.id}
-                          type="number"
-                          value={param.value}
-                          onChange={(e) => updateParameter(param.id, parseFloat(e.target.value) || 0)}
-                          step={param.unit === '°C' ? 0.1 : param.unit === 'min' ? 1 : 0.1}
-                          min={param.min}
-                          max={param.max}
-                          className="w-24"
-                        />
-                        <span className="text-sm text-muted-foreground">{param.unit}</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">{param.description}</p>
-                      <p className="text-xs text-muted-foreground">Range: {param.min} - {param.max} {param.unit}</p>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-            {/* Defrost Configuration */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  Defrost Configuration
-                  <div className="flex items-center space-x-2">
-                    <Button 
-                      onClick={startManualDefrost}
-                      disabled={defrostActive}
-                      variant={defrostActive ? "secondary" : "default"}
-                    >
-                      <Snowflake className="h-4 w-4 mr-2" />
-                      {defrostActive ? "Defrost Active..." : "Start Manual Defrost"}
-                    </Button>
-                    {defrostActive && (
-                      <Badge variant="secondary" className="animate-pulse">
-                        Defrosting
-                      </Badge>
-                    )}
+                    <span className="text-sm text-muted-foreground">°C</span>
                   </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {parameters.slice(6).map((param) => (
-                    <div key={param.id} className="space-y-2">
-                      <Label htmlFor={param.id} className="text-sm font-medium">
-                        {param.code} - {param.name}
-                      </Label>
-                      <div className="flex items-center space-x-2">
-                        <Input
-                          id={param.id}
-                          type="number"
-                          value={param.value}
-                          onChange={(e) => updateParameter(param.id, parseFloat(e.target.value) || 0)}
-                          step={param.unit === '°C' ? 0.1 : param.unit === 'min' ? 1 : param.unit === 'sec' ? 1 : 0.1}
-                          min={param.min}
-                          max={param.max}
-                          className="w-24"
-                        />
-                        <span className="text-sm text-muted-foreground">{param.unit}</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">{param.description}</p>
-                      <p className="text-xs text-muted-foreground">Range: {param.min} - {param.max} {param.unit}</p>
-                    </div>
-                  ))}
+                  <p className="text-xs text-muted-foreground">Target temperature during freezing mode</p>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Defrost Status Information</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="p-4 border rounded-lg">
-                    <div className="text-sm text-muted-foreground">Last Defrost</div>
-                    <div className="text-lg font-semibold">2 hours ago</div>
+              <div className="space-y-4">
+                <h4 className="font-medium flex items-center gap-2">
+                  <Snowflake className="h-4 w-4 text-warning" />
+                  Defrost Mode Settings
+                </h4>
+                <div className="space-y-2">
+                  <Label htmlFor="defrost-time">Defrost Window Time</Label>
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      id="defrost-time"
+                      type="number"
+                      value={autoModeConfig.defrostWindowTime}
+                      onChange={(e) => updateAutoModeConfig('defrostWindowTime', parseInt(e.target.value) || 0)}
+                      min={5}
+                      max={120}
+                      className="w-24"
+                    />
+                    <span className="text-sm text-muted-foreground">minutes</span>
                   </div>
-                  <div className="p-4 border rounded-lg">
-                    <div className="text-sm text-muted-foreground">Next Scheduled</div>
-                    <div className="text-lg font-semibold">4 hours</div>
+                  <p className="text-xs text-muted-foreground">Duration of defrost cycle (5-120 min)</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="defrost-temp">Target Temperature (Defrost)</Label>
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      id="defrost-temp"
+                      type="number"
+                      value={autoModeConfig.targetTempDefrost}
+                      onChange={(e) => updateAutoModeConfig('targetTempDefrost', parseFloat(e.target.value) || 0)}
+                      step={0.1}
+                      min={0}
+                      max={20}
+                      className="w-24"
+                    />
+                    <span className="text-sm text-muted-foreground">°C</span>
                   </div>
-                  <div className="p-4 border rounded-lg">
-                    <div className="text-sm text-muted-foreground">Defrost Cycles Today</div>
-                    <div className="text-lg font-semibold">3</div>
+                  <p className="text-xs text-muted-foreground">Target temperature during defrost mode</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Cycle Summary */}
+            <div className="mt-6 p-4 bg-muted/50 rounded-lg">
+              <h5 className="font-medium mb-2">Cycle Summary</h5>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Total Cycle Time:</span>
+                  <div className="font-medium">
+                    {formatTime(autoModeConfig.freezingWindowTime + autoModeConfig.defrostWindowTime)}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                <div>
+                  <span className="text-muted-foreground">Freezing Ratio:</span>
+                  <div className="font-medium">
+                    {(autoModeConfig.freezingWindowTime / (autoModeConfig.freezingWindowTime + autoModeConfig.defrostWindowTime) * 100).toFixed(1)}%
+                  </div>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Daily Cycles:</span>
+                  <div className="font-medium">
+                    {(1440 / (autoModeConfig.freezingWindowTime + autoModeConfig.defrostWindowTime)).toFixed(1)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Standard Parameters */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Standard Parameters
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {parameters.slice(0, 6).map((param) => (
+                <div key={param.id} className="space-y-2">
+                  <Label htmlFor={param.id} className="text-sm font-medium">
+                    {param.code} - {param.name}
+                  </Label>
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      id={param.id}
+                      type="number"
+                      value={param.value}
+                      onChange={(e) => updateParameter(param.id, parseFloat(e.target.value) || 0)}
+                      step={param.unit === '°C' ? 0.1 : param.unit === 'min' ? 1 : 0.1}
+                      min={param.min}
+                      max={param.max}
+                      className="w-24"
+                    />
+                    <span className="text-sm text-muted-foreground">{param.unit}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{param.description}</p>
+                  <p className="text-xs text-muted-foreground">Range: {param.min} - {param.max} {param.unit}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Defrost Configuration */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Defrost Configuration</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {parameters.slice(6).map((param) => (
+                <div key={param.id} className="space-y-2">
+                  <Label htmlFor={param.id} className="text-sm font-medium">
+                    {param.code} - {param.name}
+                  </Label>
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      id={param.id}
+                      type="number"
+                      value={param.value}
+                      onChange={(e) => updateParameter(param.id, parseFloat(e.target.value) || 0)}
+                      step={param.unit === '°C' ? 0.1 : param.unit === 'min' ? 1 : param.unit === 'sec' ? 1 : 0.1}
+                      min={param.min}
+                      max={param.max}
+                      className="w-24"
+                    />
+                    <span className="text-sm text-muted-foreground">{param.unit}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{param.description}</p>
+                  <p className="text-xs text-muted-foreground">Range: {param.min} - {param.max} {param.unit}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Defrost Status Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Defrost Status Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 border rounded-lg">
+                <div className="text-sm text-muted-foreground">Last Defrost</div>
+                <div className="text-lg font-semibold">2 hours ago</div>
+              </div>
+              <div className="p-4 border rounded-lg">
+                <div className="text-sm text-muted-foreground">Next Scheduled</div>
+                <div className="text-lg font-semibold">4 hours</div>
+              </div>
+              <div className="p-4 border rounded-lg">
+                <div className="text-sm text-muted-foreground">Defrost Cycles Today</div>
+                <div className="text-lg font-semibold">3</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
