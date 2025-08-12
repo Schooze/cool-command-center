@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Settings, Snowflake, RotateCcw, Save, Clock, Thermometer, Timer, Package } from 'lucide-react';
+import { Settings, Snowflake, RotateCcw, Save, Clock, Thermometer, Timer, Package, Network } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Area, ComposedChart } from 'recharts';
 
 // Simulated toast hook for demo
@@ -346,6 +346,23 @@ const Configuration = () => {
     return () => clearInterval(interval);
   }, [autoModeEnabled, autoModeConfig.cycleEnabled, autoModeConfig.freezingWindowTime, autoModeConfig.defrostWindowTime, autoModeConfig.targetTempFreezing, autoModeConfig.targetTempDefrost, cycleStatus.currentMode]);
 
+  // Floating header scroll effect - simplified
+  useEffect(() => {
+    const handleScroll = () => {
+      const floatingHeader = document.getElementById('floating-header');
+      if (floatingHeader) {
+        if (window.scrollY > 150) {
+          floatingHeader.style.transform = 'translateY(0)';
+        } else {
+          floatingHeader.style.transform = 'translateY(-100%)';
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   const updateParameter = (id: string, value: number) => {
     setParameters(prev => prev.map(param => 
       param.id === id ? { ...param, value: Math.max(param.min, Math.min(param.max, value)) } : param
@@ -411,42 +428,122 @@ const Configuration = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="mx-auto max-w-8xl space-y-6">
-        <div className="flex items-center justify-between">
+    <>
+      {/* Initial Header*/}
+      <div className="bg-background border-b">
+        <div className="mx-auto max-w-8xl p-6">
           <h1 className="text-3xl font-bold text-foreground">System Configuration</h1>
-          <div className="flex items-center gap-4">
-            {/* Device Selection Dropdown */}
-            <div className="flex items-center gap-2">
-              <Package className="h-4 w-4 text-muted-foreground" />
-              <Label htmlFor="device-select" className="text-sm text-muted-foreground">
-                Device:
-              </Label>
-              <select
-                id="device-select"
-                value={selectedDeviceId}
-                onChange={(e) => setSelectedDeviceId(e.target.value)}
-                className="min-w-[200px] px-3 py-2 text-sm border border-input bg-background rounded-md focus:ring-2 focus:ring-ring focus:border-transparent"
-              >
-                {connectedDevices.map((device) => (
-                  <option key={device.id} value={device.id}>
-                    {device.name} ({device.serialNumber})
-                  </option>
-                ))}
-              </select>
+        </div>
+      </div>
+
+      {/* Floating Side Menu - individual hover untuk setiap item */}
+      <div className="fixed right-0 top-1/2 transform -translate-y-1/2 z-40 transition-all duration-300" id="floating-header">
+        <div className="bg-primary shadow-lg rounded-l-lg">
+          
+          {/* Device Selection */}
+          <div className="relative group">
+            <div className="w-12 h-12 flex items-center justify-center text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer border-b border-primary-foreground/20">
+              <Network className="h-5 w-5" />
             </div>
-            <div className="flex gap-2">
-              <Button onClick={resetToDefaults} variant="outline">
-                <RotateCcw className="h-4 w-4 mr-2" />
-                Reset Defaults
-              </Button>
-              <Button onClick={saveConfiguration}>
-                <Save className="h-4 w-4 mr-2" />
-                Save Configuration
-              </Button>
+            {/* Extended Menu - hanya untuk device */}
+            <div className="absolute right-12 top-0 w-64 bg-background border border-border rounded-l-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50">
+              <div className="p-4">
+                <div className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                  <Network className="h-4 w-4" />
+                  Select Device
+                </div>
+                <select
+                  value={selectedDeviceId}
+                  onChange={(e) => setSelectedDeviceId(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-input bg-background rounded-md focus:ring-2 focus:ring-ring focus:border-transparent"
+                >
+                  {connectedDevices.map((device) => (
+                    <option key={device.id} value={device.id}>
+                      {device.name} ({device.serialNumber})
+                    </option>
+                  ))}
+                </select>
+                {selectedDevice && (
+                  <div className="mt-3 p-3 bg-muted rounded-md">
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className={`w-2 h-2 rounded-full ${selectedDevice.status === 'online' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                      <span className="capitalize font-medium">{selectedDevice.status}</span>
+                      <span className="text-muted-foreground">•</span>
+                      <span className="text-muted-foreground">{selectedDevice.productType}</span>
+                    </div>
+                    <div className="text-sm text-muted-foreground mt-1">
+                      📍 {selectedDevice.location}
+                    </div>
+                    <div className="text-sm font-medium mt-1">
+                      🌡️ {selectedDevice.temperature.toFixed(1)}°C
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
+
+          {/* Reset Button */}
+          <div className="relative group">
+            <div className="w-12 h-12 flex items-center justify-center text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer border-b border-primary-foreground/20">
+              <RotateCcw className="h-5 w-5" />
+            </div>
+            {/* Extended Menu - hanya untuk reset */}
+            <div className="absolute right-12 top-0 bg-background border border-border rounded-l-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50">
+              <div className="p-4">
+                <div className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                  <RotateCcw className="h-4 w-4" />
+                  Reset Configuration
+                </div>
+                <p className="text-sm text-muted-foreground mb-3">
+                  This will reset all parameters to factory defaults.
+                </p>
+                <Button 
+                  onClick={resetToDefaults} 
+                  variant="outline" 
+                  size="sm"
+                  className="w-full"
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Reset to Defaults
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Save Button */}
+          <div className="relative group">
+            <div className="w-12 h-12 flex items-center justify-center text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer">
+              <Save className="h-5 w-5" />
+            </div>
+            {/* Extended Menu - hanya untuk save */}
+            <div className="absolute right-12 top-0 bg-background border border-border rounded-l-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50">
+              <div className="p-4">
+                <div className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                  <Save className="h-4 w-4" />
+                  Save Configuration
+                </div>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Save current settings for {selectedDevice?.name || 'selected device'}.
+                </p>
+                <Button 
+                  onClick={saveConfiguration} 
+                  size="sm"
+                  className="w-full"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Configuration
+                </Button>
+              </div>
+            </div>
+          </div>
+
         </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="min-h-screen bg-background">
+        <div className="mx-auto max-w-8xl p-6 space-y-6">
 
         {/* Current Auto Cycle Status */}
         {autoModeEnabled && autoModeConfig.cycleEnabled && (
@@ -800,8 +897,9 @@ const Configuration = () => {
             </div>
           </CardContent>
         </Card>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
