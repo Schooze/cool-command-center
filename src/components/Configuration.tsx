@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Cookies from 'js-cookie'; // 🔧 ADD: Import Cookies
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,38 +10,51 @@ import { Progress } from '@/components/ui/progress';
 import { Settings, Snowflake, RotateCcw, Save, Clock, Thermometer, Timer, Package, Network } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Area, ComposedChart } from 'recharts';
 
-// Simulated toast hook for demo
+// Toast hook
 const useToast = () => ({
-  toast: ({ title, description }: { title: string; description: string }) => {
+  toast: ({ title, description, variant }: { title: string; description: string; variant?: string }) => {
     console.log(`Toast: ${title} - ${description}`);
-    // In real app, this would show actual toast notification
   }
 });
 
-// CycleGraph component with real chart visualization
+// Backend interfaces
+interface BackendProduct {
+  id: string;
+  serial_number: string;
+  name: string;
+  product_type_name: string;
+  status: 'online' | 'offline';
+  installed_at: string;
+  location_lat?: number;
+  location_long?: number;
+}
+
+interface ConfigSaveRequest {
+  device_id: string;
+  parameters: {
+    [key: string]: number;
+  };
+}
+
+// CycleGraph component (unchanged)
 const CycleGraph = ({ freezingTime, defrostTime, targetTempFreezing, targetTempDefrost, currentTime, currentTemp, currentMode }: any) => {
-  // Generate 24-hour data points (every 15 minutes = 96 points)
   const generateCycleData = () => {
     const data = [];
     const totalCycleTime = freezingTime + defrostTime;
     let currentCycleTime = 0;
     let isFreezingMode = true;
     
-    for (let minute = 0; minute < 1440; minute += 15) { // Every 15 minutes
+    for (let minute = 0; minute < 1440; minute += 15) {
       const hour = Math.floor(minute / 60);
       const min = minute % 60;
       const timeLabel = `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`;
       
-      // Determine current mode in cycle
       if (currentCycleTime >= (isFreezingMode ? freezingTime : defrostTime)) {
         isFreezingMode = !isFreezingMode;
         currentCycleTime = 0;
       }
       
-      // Calculate target temperature based on mode
       const targetTemp = isFreezingMode ? targetTempFreezing : targetTempDefrost;
-      
-      // Add some realistic temperature variation
       const tempVariation = Math.sin((minute / 60) * 0.5) * 1 + (Math.random() - 0.5) * 0.8;
       const temperature = targetTemp + tempVariation;
       
@@ -50,8 +64,8 @@ const CycleGraph = ({ freezingTime, defrostTime, targetTempFreezing, targetTempD
         temperature: Math.round(temperature * 10) / 10,
         targetTemp: targetTemp,
         mode: isFreezingMode ? 'Freezing' : 'Defrost',
-        isCurrent: Math.abs(minute - currentTime) < 15, // Highlight current time window
-        modeValue: isFreezingMode ? -20 : 10 // For area chart
+        isCurrent: Math.abs(minute - currentTime) < 15,
+        modeValue: isFreezingMode ? -20 : 10
       });
       
       currentCycleTime += 15;
@@ -62,7 +76,6 @@ const CycleGraph = ({ freezingTime, defrostTime, targetTempFreezing, targetTempD
 
   const chartData = generateCycleData();
   
-  // Custom tooltip component
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
@@ -117,7 +130,7 @@ const CycleGraph = ({ freezingTime, defrostTime, targetTempFreezing, targetTempD
           <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
           <XAxis 
             dataKey="timeLabel"
-            interval={Math.floor(chartData.length / 12)} // Show ~12 labels
+            interval={Math.floor(chartData.length / 12)}
             fontSize={12}
             stroke="#666"
           />
@@ -129,7 +142,6 @@ const CycleGraph = ({ freezingTime, defrostTime, targetTempFreezing, targetTempD
           />
           <Tooltip content={<CustomTooltip />} />
           
-          {/* Target temperature line */}
           <Line
             type="stepAfter"
             dataKey="targetTemp"
@@ -140,7 +152,6 @@ const CycleGraph = ({ freezingTime, defrostTime, targetTempFreezing, targetTempD
             name="Target Temperature"
           />
           
-          {/* Actual temperature line */}
           <Line
             type="monotone"
             dataKey="temperature"
@@ -155,7 +166,6 @@ const CycleGraph = ({ freezingTime, defrostTime, targetTempFreezing, targetTempD
             name="Actual Temperature"
           />
           
-          {/* Current time indicator */}
           <ReferenceLine 
             x={chartData.find(d => d.isCurrent)?.timeLabel || chartData[Math.floor(currentTime / 15)]?.timeLabel} 
             stroke="#ef4444" 
@@ -181,18 +191,18 @@ interface Parameter {
 }
 
 interface AutoModeConfig {
-  freezingWindowTime: number; // minutes
-  defrostWindowTime: number; // minutes
-  targetTempFreezing: number; // °C
-  targetTempDefrost: number; // °C
+  freezingWindowTime: number;
+  defrostWindowTime: number;
+  targetTempFreezing: number;
+  targetTempDefrost: number;
   cycleEnabled: boolean;
 }
 
 interface CycleStatus {
   currentMode: 'freezing' | 'defrost' | 'idle';
-  timeRemaining: number; // minutes
-  cycleProgress: number; // percentage
-  totalCycleTime: number; // minutes
+  timeRemaining: number;
+  cycleProgress: number;
+  totalCycleTime: number;
 }
 
 interface ConnectedDevice {
@@ -207,58 +217,42 @@ interface ConnectedDevice {
 
 const Configuration = () => {
   const { toast } = useToast();
+  
+  // 🆕 Backend integration state
+  const [connectedDevices, setConnectedDevices] = useState<ConnectedDevice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // API configuration
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+  
+  // Get auth token - 🔧 FIX: Use Cookies instead of localStorage
+  const getAuthToken = () => {
+    return Cookies.get('auth_token');
+  };
+
+  // API Headers
+  const getHeaders = () => {
+    const token = getAuthToken();
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': token ? `Bearer ${token}` : '',
+    };
+  };
+
+  // Original state
   const [autoModeEnabled, setAutoModeEnabled] = useState(true);
   const [defrostActive, setDefrostActive] = useState(false);
   const [freezeActive, setFreezeActive] = useState(false);
-
-  // Mock data untuk connected devices berdasarkan database schema
-  const [connectedDevices] = useState<ConnectedDevice[]>([
-    {
-      id: 'uuid-1',
-      serialNumber: 'KRN-FRZ-001',
-      name: 'Cold Storage Unit 1',
-      productType: 'Blast Freezer',
-      location: 'Warehouse A',
-      status: 'online',
-      temperature: -16.5
-    },
-    {
-      id: 'uuid-2', 
-      serialNumber: 'KRN-FRZ-002',
-      name: 'Cold Storage Unit 2',
-      productType: 'Display Freezer',
-      location: 'Warehouse B',
-      status: 'online',
-      temperature: -18.2
-    },
-    {
-      id: 'uuid-3',
-      serialNumber: 'KRN-FRZ-003', 
-      name: 'Cold Storage Unit 3',
-      productType: 'Blast Freezer',
-      location: 'Production Floor',
-      status: 'offline',
-      temperature: -15.8
-    },
-    {
-      id: 'uuid-4',
-      serialNumber: 'KRN-FRZ-004',
-      name: 'Cold Storage Unit 4', 
-      productType: 'Walk-in Freezer',
-      location: 'Storage Room C',
-      status: 'online',
-      temperature: -17.1
-    }
-  ]);
-
-  // Selected device state
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string>(connectedDevices[0]?.id || '');
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
+  
+  // Selected device
   const selectedDevice = connectedDevices.find(device => device.id === selectedDeviceId);
 
   // Auto mode cycle configuration
   const [autoModeConfig, setAutoModeConfig] = useState<AutoModeConfig>({
-    freezingWindowTime: 240, // 4 hours
-    defrostWindowTime: 30,   // 30 minutes
+    freezingWindowTime: 240,
+    defrostWindowTime: 30,
     targetTempFreezing: -18.0,
     targetTempDefrost: 8.0,
     cycleEnabled: true
@@ -267,23 +261,17 @@ const Configuration = () => {
   // Current cycle status simulation
   const [cycleStatus, setCycleStatus] = useState<CycleStatus>({
     currentMode: 'freezing',
-    timeRemaining: 180, // 3 hours remaining in freezing
-    cycleProgress: 25,  // 25% through current cycle
-    totalCycleTime: 270 // total cycle time (freezing + defrost)
+    timeRemaining: 180,
+    cycleProgress: 25,
+    totalCycleTime: 270
   });
 
-  // Simulate current temperature and time - now based on selected device
-  const [currentTemp, setCurrentTemp] = useState(selectedDevice?.temperature || -16.5);
-  const [currentTime, setCurrentTime] = useState(420); // 7:00 AM (420 minutes from 6:00 AM)
+  // Temperature and time simulation
+  const [currentTemp, setCurrentTemp] = useState(-16.5);
+  const [currentTime, setCurrentTime] = useState(420);
 
-  // Update temperature when device changes
-  useEffect(() => {
-    if (selectedDevice) {
-      setCurrentTemp(selectedDevice.temperature);
-    }
-  }, [selectedDevice]);
-
-  const [parameters, setParameters] = useState<Parameter[]>([
+  // 🆕 Default parameters (factory defaults)
+  const defaultParameters: Parameter[] = [
     { id: 'f01', code: 'F01', name: 'Temperature setpoint', value: -18.0, unit: '°C', min: -30, max: 10, description: 'Target temperature for the cooling system' },
     { id: 'f02', code: 'F02', name: 'Hysteresis value', value: 2.0, unit: '°C', min: 0.1, max: 10, description: 'Temperature difference for compressor cycling' },
     { id: 'f03', code: 'F03', name: 'High alarm threshold', value: -10.0, unit: '°C', min: -20, max: 20, description: 'Temperature threshold for high alarm' },
@@ -296,23 +284,212 @@ const Configuration = () => {
     { id: 'f10', code: 'F10', name: 'Fan mode', value: 1, unit: '', min: 0, max: 2, description: '0=Off during defrost, 1=On, 2=Delayed start' },
     { id: 'f11', code: 'F11', name: 'Drip time after defrost', value: 5, unit: 'min', min: 0, max: 30, description: 'Wait time after defrost before restarting' },
     { id: 'f12', code: 'F12', name: 'Door open alarm time', value: 60, unit: 'sec', min: 10, max: 300, description: 'Time before door open alarm triggers' },
-  ]);
+  ];
 
-  // Simulate cycle progress and temperature
+  const [parameters, setParameters] = useState<Parameter[]>(defaultParameters);
+
+  // 🆕 Fetch devices from backend
+  const fetchDevices = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE_URL}/api/devices/products`, {
+        method: 'GET',
+        headers: getHeaders(),
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          toast({
+            title: "Error",
+            description: "Session expired. Please login again.",
+            variant: "destructive"
+          });
+          return;
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const backendDevices: BackendProduct[] = await response.json();
+      
+      // Convert backend format to frontend format
+      const formattedDevices: ConnectedDevice[] = backendDevices.map(device => ({
+        id: device.id,
+        serialNumber: device.serial_number,
+        name: device.name,
+        productType: device.product_type_name,
+        location: device.location_lat && device.location_long 
+          ? `${device.location_lat.toFixed(4)}, ${device.location_long.toFixed(4)}`
+          : 'Unknown Location',
+        status: device.status,
+        temperature: -18.0 + (Math.random() - 0.5) * 4 // Simulate temperature for now
+      }));
+
+      setConnectedDevices(formattedDevices);
+      
+      // Set first device as selected if none selected
+      if (formattedDevices.length > 0 && !selectedDeviceId) {
+        setSelectedDeviceId(formattedDevices[0].id);
+      }
+      
+    } catch (error) {
+      console.error('Error fetching devices:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load devices. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 🆕 Save configuration to InfluxDB
+  const saveConfigurationToInfluxDB = async (deviceSerialNumber: string, configData: { [key: string]: number }) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/devices/config/save`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          device_id: deviceSerialNumber,
+          parameters: configData
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to save configuration');
+      }
+
+      const result = await response.json();
+      return result;
+      
+    } catch (error) {
+      console.error('Error saving to InfluxDB:', error);
+      throw error;
+    }
+  };
+
+  // 🆕 Load configuration from InfluxDB  
+  const loadConfigurationFromInfluxDB = async (deviceSerialNumber: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/devices/config/load/${deviceSerialNumber}`, {
+        method: 'GET',
+        headers: getHeaders(),
+      });
+
+      if (!response.ok) {
+        console.log('No existing configuration found, using defaults');
+        return null;
+      }
+
+      const result = await response.json();
+      return result.parameters;
+      
+    } catch (error) {
+      console.error('Error loading from InfluxDB:', error);
+      return null;
+    }
+  };
+
+  // 🆕 Save configuration with backend integration
+  const saveConfiguration = async () => {
+    if (!selectedDevice) {
+      toast({
+        title: "Error",
+        description: "No device selected.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setSaving(true);
+      
+      // Prepare configuration data (F01-F12 parameters)
+      const configData: { [key: string]: number } = {};
+      parameters.forEach(param => {
+        configData[param.code.toLowerCase()] = param.value;
+      });
+
+      // Save to InfluxDB via backend
+      await saveConfigurationToInfluxDB(selectedDevice.serialNumber, configData);
+
+      toast({
+        title: "Configuration Saved",
+        description: `Configuration saved to InfluxDB for ${selectedDevice.name}.`,
+      });
+      
+    } catch (error) {
+      console.error('Save configuration error:', error);
+      toast({
+        title: "Error",
+        description: `Failed to save configuration: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // 🆕 Reset to defaults with save option
+  const resetToDefaults = async () => {
+    setParameters([...defaultParameters]);
+    
+    toast({
+      title: "Reset to Defaults",
+      description: "All parameters have been reset to factory defaults. Click Save to apply to device.",
+    });
+  };
+
+  // 🆕 Load device configuration when device changes
+  const loadDeviceConfiguration = async (deviceSerialNumber: string) => {
+    try {
+      const configData = await loadConfigurationFromInfluxDB(deviceSerialNumber);
+      
+      if (configData) {
+        // Update parameters with data from InfluxDB
+        setParameters(prev => prev.map(param => ({
+          ...param,
+          value: configData[param.code.toLowerCase()] ?? param.value
+        })));
+        
+        console.log('Configuration loaded from InfluxDB for device:', deviceSerialNumber);
+      } else {
+        // Use default parameters if no config found
+        setParameters([...defaultParameters]);
+      }
+    } catch (error) {
+      console.error('Error loading device configuration:', error);
+      // Fallback to defaults on error
+      setParameters([...defaultParameters]);
+    }
+  };
+
+  // 🆕 Fetch devices on component mount
+  useEffect(() => {
+    fetchDevices();
+  }, []);
+
+  // 🆕 Load configuration when device changes
+  useEffect(() => {
+    if (selectedDevice) {
+      loadDeviceConfiguration(selectedDevice.serialNumber);
+      setCurrentTemp(selectedDevice.temperature);
+    }
+  }, [selectedDevice]);
+
+  // Cycle simulation (unchanged)
   useEffect(() => {
     if (!autoModeEnabled || !autoModeConfig.cycleEnabled) return;
 
     const interval = setInterval(() => {
-      // Update time (every minute for demo)
-      setCurrentTime(prev => (prev + 1) % 1440); // Reset every 24 hours
+      setCurrentTime(prev => (prev + 1) % 1440);
       
-      // Simulate temperature changes based on mode
       setCurrentTemp(prev => {
         const targetTemp = cycleStatus.currentMode === 'freezing' 
           ? autoModeConfig.targetTempFreezing 
           : autoModeConfig.targetTempDefrost;
         
-        // Gradually move towards target temperature
         const diff = targetTemp - prev;
         return prev + (diff * 0.1) + (Math.random() - 0.5) * 0.5;
       });
@@ -321,7 +498,6 @@ const Configuration = () => {
         const newTimeRemaining = Math.max(0, prev.timeRemaining - 1);
         
         if (newTimeRemaining === 0) {
-          // Switch modes when time runs out
           const newMode = prev.currentMode === 'freezing' ? 'defrost' : 'freezing';
           const newTotalTime = newMode === 'freezing' ? autoModeConfig.freezingWindowTime : autoModeConfig.defrostWindowTime;
           
@@ -341,12 +517,12 @@ const Configuration = () => {
           cycleProgress: Math.min(100, progress)
         };
       });
-    }, 2000); // Update every 2 seconds for demo (in real system would be actual time)
+    }, 2000);
 
     return () => clearInterval(interval);
   }, [autoModeEnabled, autoModeConfig.cycleEnabled, autoModeConfig.freezingWindowTime, autoModeConfig.defrostWindowTime, autoModeConfig.targetTempFreezing, autoModeConfig.targetTempDefrost, cycleStatus.currentMode]);
 
-  // Floating header scroll effect - simplified
+  // Floating header scroll effect
   useEffect(() => {
     const handleScroll = () => {
       const floatingHeader = document.getElementById('floating-header');
@@ -363,6 +539,7 @@ const Configuration = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Parameter update
   const updateParameter = (id: string, value: number) => {
     setParameters(prev => prev.map(param => 
       param.id === id ? { ...param, value: Math.max(param.min, Math.min(param.max, value)) } : param
@@ -373,20 +550,6 @@ const Configuration = () => {
     setAutoModeConfig(prev => ({ ...prev, [field]: value }));
   };
 
-  const saveConfiguration = () => {
-    toast({
-      title: "Configuration Saved",
-      description: `Configuration saved for ${selectedDevice?.name || 'selected device'}.`,
-    });
-  };
-
-  const resetToDefaults = () => {
-    toast({
-      title: "Reset to Defaults",
-      description: "All parameters have been reset to factory defaults.",
-    });
-  };
-
   const startManualDefrost = () => {
     setDefrostActive(true);
     toast({
@@ -394,7 +557,6 @@ const Configuration = () => {
       description: `Defrost cycle initiated for ${selectedDevice?.name || 'selected device'}.`,
     });
     
-    // Simulate defrost completion after 5 seconds for demo
     setTimeout(() => {
       setDefrostActive(false);
       toast({
@@ -411,7 +573,6 @@ const Configuration = () => {
       description: `Freezing cycle initiated for ${selectedDevice?.name || 'selected device'}.`,
     });
 
-    // Simulate freezing completion after 5 seconds for demo
     setTimeout(() => {
       setFreezeActive(false);
       toast({
@@ -436,7 +597,7 @@ const Configuration = () => {
         </div>
       </div>
 
-      {/* Floating Side Menu - individual hover untuk setiap item */}
+      {/* Floating Side Menu */}
       <div className="fixed right-0 top-1/2 transform -translate-y-1/2 z-40 transition-all duration-300" id="floating-header">
         <div className="bg-primary shadow-lg rounded-l-lg">
           
@@ -445,7 +606,6 @@ const Configuration = () => {
             <div className="w-12 h-12 flex items-center justify-center text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer border-b border-primary-foreground/20">
               <Network className="h-5 w-5" />
             </div>
-            {/* Extended Menu - hanya untuk device */}
             <div className="absolute right-12 top-0 w-64 bg-background border border-border rounded-l-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50">
               <div className="p-4">
                 <div className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
@@ -455,13 +615,20 @@ const Configuration = () => {
                 <select
                   value={selectedDeviceId}
                   onChange={(e) => setSelectedDeviceId(e.target.value)}
+                  disabled={loading}
                   className="w-full px-3 py-2 text-sm border border-input bg-background rounded-md focus:ring-2 focus:ring-ring focus:border-transparent"
                 >
-                  {connectedDevices.map((device) => (
-                    <option key={device.id} value={device.id}>
-                      {device.name} ({device.serialNumber})
-                    </option>
-                  ))}
+                  {loading ? (
+                    <option>Loading devices...</option>
+                  ) : connectedDevices.length === 0 ? (
+                    <option>No devices found</option>
+                  ) : (
+                    connectedDevices.map((device) => (
+                      <option key={device.id} value={device.id}>
+                        {device.name} ({device.serialNumber})
+                      </option>
+                    ))
+                  )}
                 </select>
                 {selectedDevice && (
                   <div className="mt-3 p-3 bg-muted rounded-md">
@@ -488,7 +655,6 @@ const Configuration = () => {
             <div className="w-12 h-12 flex items-center justify-center text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer border-b border-primary-foreground/20">
               <RotateCcw className="h-5 w-5" />
             </div>
-            {/* Extended Menu - hanya untuk reset */}
             <div className="absolute right-12 top-0 bg-background border border-border rounded-l-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50">
               <div className="p-4">
                 <div className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
@@ -516,7 +682,6 @@ const Configuration = () => {
             <div className="w-12 h-12 flex items-center justify-center text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer">
               <Save className="h-5 w-5" />
             </div>
-            {/* Extended Menu - hanya untuk save */}
             <div className="absolute right-12 top-0 bg-background border border-border rounded-l-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50">
               <div className="p-4">
                 <div className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
@@ -530,9 +695,19 @@ const Configuration = () => {
                   onClick={saveConfiguration} 
                   size="sm"
                   className="w-full"
+                  disabled={saving || !selectedDevice}
                 >
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Configuration
+                  {saving ? (
+                    <>
+                      <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Configuration
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
@@ -811,7 +986,7 @@ const Configuration = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Settings className="h-5 w-5" />
-              Standard Parameters
+              Standard Parameters (F01-F06)
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -845,7 +1020,7 @@ const Configuration = () => {
         {/* Defrost Configuration */}
         <Card>
           <CardHeader>
-            <CardTitle>Defrost Configuration</CardTitle>
+            <CardTitle>Defrost Configuration (F07-F12)</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -875,28 +1050,53 @@ const Configuration = () => {
           </CardContent>
         </Card>
 
-        {/* Defrost Status Information */}
+        {/* Configuration Status */}
         <Card>
           <CardHeader>
-            <CardTitle>Defrost Status Information</CardTitle>
+            <CardTitle>Configuration Status</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 border rounded-lg">
-                <div className="text-sm text-muted-foreground">Last Defrost</div>
-                <div className="text-lg font-semibold">2 hours ago</div>
+                <div className="text-sm text-muted-foreground">Selected Device</div>
+                <div className="text-lg font-semibold">
+                  {selectedDevice ? selectedDevice.name : 'No device selected'}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {selectedDevice ? `Serial: ${selectedDevice.serialNumber}` : ''}
+                </div>
               </div>
               <div className="p-4 border rounded-lg">
-                <div className="text-sm text-muted-foreground">Next Scheduled</div>
-                <div className="text-lg font-semibold">4 hours</div>
+                <div className="text-sm text-muted-foreground">Configuration Source</div>
+                <div className="text-lg font-semibold">InfluxDB</div>
+                <div className="text-sm text-muted-foreground">
+                  {selectedDevice ? 'Auto-loaded from device' : 'Using defaults'}
+                </div>
               </div>
               <div className="p-4 border rounded-lg">
-                <div className="text-sm text-muted-foreground">Defrost Cycles Today</div>
-                <div className="text-lg font-semibold">3</div>
+                <div className="text-sm text-muted-foreground">Last Action</div>
+                <div className="text-lg font-semibold">
+                  {saving ? 'Saving...' : 'Ready'}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Click Save to apply changes
+                </div>
+              </div>
+            </div>
+            
+            {/* Configuration Info */}
+            <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h5 className="font-medium mb-2 text-blue-800">Configuration Info</h5>
+              <div className="text-sm text-blue-700 space-y-1">
+                <p>• Parameters F01-F12 will be saved to InfluxDB with device serial number as filter</p>
+                <p>• Configuration is automatically loaded when switching devices</p>
+                <p>• Reset to Defaults will restore factory settings (save required to apply)</p>
+                <p>• All changes are stored in measurement format: {`{device_serial}_field`}</p>
               </div>
             </div>
           </CardContent>
         </Card>
+        
         </div>
       </div>
     </>
