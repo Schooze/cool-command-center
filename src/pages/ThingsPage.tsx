@@ -1,74 +1,100 @@
-import React, { useState } from 'react';
-import { Network, Edit2, Trash2, Plus, Package, Check, X, QrCode } from 'lucide-react';
+// src/pages/ThingsPage.tsx - Updated with backend integration
+import React, { useState, useEffect } from 'react';
+import { Network, Edit2, Trash2, Plus, Package, Check, X, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import QRScannerModal from '@/components/QRScannerModal';
 
-// Type definitions
-interface IoTDevice {
+// Type definitions based on backend schema
+interface Product {
   id: string;
+  serial_number: string;
   name: string;
-  type: string;
-  image: string;
+  product_type_name: string;
   status: 'online' | 'offline';
-  connectedAt: Date;
+  installed_at: string;
+  location_lat?: number;
+  location_long?: number;
+}
+
+interface DeviceRegistrationRequest {
+  device_id: string;
+}
+
+interface DeviceRegistrationResponse {
+  success: boolean;
+  message: string;
+  product?: any;
 }
 
 const ThingsPage: React.FC = () => {
   const { toast } = useToast();
   
   // State management
-  const [devices, setDevices] = useState<IoTDevice[]>([
-    {
-      id: "FRZ001",
-      name: "Main Freezer Unit A",
-      type: "Industrial Freezer",
-      image: "/api/placeholder/80/80",
-      status: 'online',
-      connectedAt: new Date('2024-01-15')
-    },
-    {
-      id: "FRZ002", 
-      name: "Backup Freezer Unit B",
-      type: "Commercial Freezer",
-      image: "/api/placeholder/80/80",
-      status: 'online',
-      connectedAt: new Date('2024-01-20')
-    },
-    {
-      id: "THM001",
-      name: "Temperature Monitor 1",
-      type: "Temperature Sensor",
-      image: "/api/placeholder/80/80", 
-      status: 'offline',
-      connectedAt: new Date('2024-02-01')
-    }
-  ]);
-  
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [newDeviceId, setNewDeviceId] = useState('');
-  const [editingDevice, setEditingDevice] = useState<string | null>(null);
+  const [editingProduct, setEditingProduct] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
-  const [isQRModalOpen, setIsQRModalOpen] = useState(false);
 
-  // QR Scanner Functions
-  const openQRScanner = () => {
-    setIsQRModalOpen(true);
+  // API Base URL - adjust sesuai environment
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8001';
+
+  // Get auth token from localStorage
+  const getAuthToken = () => {
+    return localStorage.getItem('access_token');
   };
 
-  const closeQRScanner = () => {
-    setIsQRModalOpen(false);
+  // API Headers with authentication
+  const getHeaders = () => {
+    const token = getAuthToken();
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': token ? `Bearer ${token}` : '',
+    };
   };
 
-  const handleQRScanResult = (scannedText: string) => {
-    console.log('QR Code scanned:', scannedText);
-    setNewDeviceId(scannedText);
+  // Fetch products from backend
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE_URL}/api/devices/products`, {
+        method: 'GET',
+        headers: getHeaders(),
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          toast({
+            title: "Error",
+            description: "Session expired. Please login again.",
+            variant: "destructive"
+          });
+          // Redirect to login or handle auth error
+          return;
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setProducts(data);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load devices. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Add new device function
-  const handleAddDevice = () => {
+  // Register new device
+  const handleAddDevice = async () => {
     if (!newDeviceId.trim()) {
       toast({
         title: "Error",
@@ -78,46 +104,54 @@ const ThingsPage: React.FC = () => {
       return;
     }
 
-    // Check for duplicate ID
-    const isDuplicate = devices.some(device => 
-      device.id.toLowerCase() === newDeviceId.trim().toLowerCase()
-    );
+    try {
+      setSubmitting(true);
+      
+      const requestBody: DeviceRegistrationRequest = {
+        device_id: newDeviceId.trim()
+      };
 
-    if (isDuplicate) {
+      const response = await fetch(`${API_BASE_URL}/api/devices/register`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify(requestBody),
+      });
+
+      const data: DeviceRegistrationResponse = await response.json();
+
+      if (!response.ok) {
+        toast({
+          title: "Error",
+          description: data.message || "Failed to register device",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (data.success) {
+        toast({
+          title: "Success",
+          description: data.message,
+        });
+        
+        setNewDeviceId('');
+        // Refresh products list
+        await fetchProducts();
+      }
+    } catch (error) {
+      console.error('Error registering device:', error);
       toast({
-        title: "Error", 
-        description: "Device ID sudah terdaftar. Gunakan ID yang berbeda.",
+        title: "Error",
+        description: "Network error. Please check your connection.",
         variant: "destructive"
       });
-      return;
+    } finally {
+      setSubmitting(false);
     }
-
-    // Create new device
-    const newDevice: IoTDevice = {
-      id: newDeviceId.trim(),
-      name: `New Device ${newDeviceId}`,
-      type: "Unknown Device",
-      image: "/api/placeholder/80/80",
-      status: 'offline',
-      connectedAt: new Date()
-    };
-
-    setDevices([...devices, newDevice]);
-    setNewDeviceId('');
-    
-    toast({
-      title: "Success",
-      description: `Device ${newDeviceId} berhasil ditambahkan`,
-    });
   };
 
-  // Edit device name
-  const startEdit = (device: IoTDevice) => {
-    setEditingDevice(device.id);
-    setEditName(device.name);
-  };
-
-  const saveEdit = () => {
+  // Update product name
+  const saveEdit = async () => {
     if (!editName.trim()) {
       toast({
         title: "Error",
@@ -127,41 +161,115 @@ const ThingsPage: React.FC = () => {
       return;
     }
 
-    setDevices(devices.map(device => 
-      device.id === editingDevice 
-        ? { ...device, name: editName.trim() }
-        : device
-    ));
-    
-    setEditingDevice(null);
-    setEditName('');
-    
-    toast({
-      title: "Success", 
-      description: "Nama device berhasil diupdate",
-    });
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/devices/products/${editingProduct}/name?new_name=${encodeURIComponent(editName.trim())}`, 
+        {
+          method: 'PUT',
+          headers: getHeaders(),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast({
+          title: "Error",
+          description: data.detail || "Failed to update device name",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (data.success) {
+        toast({
+          title: "Success",
+          description: data.message,
+        });
+        
+        setEditingProduct(null);
+        setEditName('');
+        // Refresh products list
+        await fetchProducts();
+      }
+    } catch (error) {
+      console.error('Error updating product name:', error);
+      toast({
+        title: "Error",
+        description: "Network error. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Delete product
+  const handleDeleteProduct = async (productId: string) => {
+    if (!confirm('Are you sure you want to delete this device?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/devices/products/${productId}`, {
+        method: 'DELETE',
+        headers: getHeaders(),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast({
+          title: "Error",
+          description: data.detail || "Failed to delete device",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (data.success) {
+        toast({
+          title: "Success",
+          description: data.message,
+        });
+        
+        // Refresh products list
+        await fetchProducts();
+      }
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      toast({
+        title: "Error",
+        description: "Network error. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Edit functions
+  const startEdit = (product: Product) => {
+    setEditingProduct(product.id);
+    setEditName(product.name);
   };
 
   const cancelEdit = () => {
-    setEditingDevice(null);
+    setEditingProduct(null);
     setEditName('');
-  };
-
-  // Delete device
-  const handleDeleteDevice = (deviceId: string) => {
-    setDevices(devices.filter(device => device.id !== deviceId));
-    toast({
-      title: "Success",
-      description: "Device berhasil dihapus",
-    });
   };
 
   // Handle enter key for adding device
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !submitting) {
       handleAddDevice();
     }
   };
+
+  // Load products on component mount
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  // Calculate statistics
+  const onlineDevices = products.filter(p => p.status === 'online').length;
+  const offlineDevices = products.filter(p => p.status === 'offline').length;
 
   return (
     <div className="space-y-6">
@@ -170,8 +278,16 @@ const ThingsPage: React.FC = () => {
         <Network className="h-6 w-6 text-primary" />
         <h1 className="text-2xl font-bold">Things</h1>
         <Badge variant="outline" className="ml-auto">
-          {devices.length} Connected Devices
+          {products.length} Connected Devices
         </Badge>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={fetchProducts}
+          disabled={loading}
+        >
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+        </Button>
       </div>
 
       {/* Add Device Section */}
@@ -183,25 +299,29 @@ const ThingsPage: React.FC = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-2">
-            <Input
-              placeholder="Enter Device ID (e.g., FRZ003)"
-              value={newDeviceId}
-              onChange={(e) => setNewDeviceId(e.target.value)}
-              onKeyPress={handleKeyPress}
-              className="flex-1"
-            />
-            {/* <Button 
-              onClick={openQRScanner}
-              variant="outline"
-              className="px-4 flex items-center gap-2"
-            >
-              <QrCode className="h-4 w-4" />
-              Scan QR
-            </Button> */}
-            <Button onClick={handleAddDevice} className="px-6">
-              Submit
-            </Button>
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Enter Device ID (e.g., F0101ABC123)"
+                value={newDeviceId}
+                onChange={(e) => setNewDeviceId(e.target.value)}
+                onKeyPress={handleKeyPress}
+                className="flex-1"
+                disabled={submitting}
+              />
+              <Button 
+                onClick={handleAddDevice} 
+                className="px-6"
+                disabled={submitting}
+              >
+                {submitting ? 'Submitting...' : 'Submit'}
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              * Device ID format: F0101 + MAC Address (e.g., F0101ABC123DEF456)
+              <br />
+              * Prefix F0101 will be registered as Commercial Freezer
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -215,16 +335,22 @@ const ThingsPage: React.FC = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {devices.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-12">
+              <RefreshCw className="h-8 w-8 mx-auto mb-4 animate-spin text-muted-foreground" />
+              <p className="text-muted-foreground">Loading devices...</p>
+            </div>
+          ) : products.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Network className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>Belum ada device yang terhubung</p>
+              <p className="text-sm mt-2">Gunakan form di atas untuk menambahkan device baru</p>
             </div>
           ) : (
             <div className="space-y-4">
-              {devices.map((device) => (
+              {products.map((product) => (
                 <div 
-                  key={device.id}
+                  key={product.id}
                   className="flex items-center gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                 >
                   {/* Device Image */}
@@ -234,7 +360,7 @@ const ThingsPage: React.FC = () => {
 
                   {/* Device Info */}
                   <div className="flex-1 min-w-0">
-                    {editingDevice === device.id ? (
+                    {editingProduct === product.id ? (
                       <div className="space-y-2">
                         <Input
                           value={editName}
@@ -242,34 +368,39 @@ const ThingsPage: React.FC = () => {
                           className="font-medium"
                           onKeyPress={(e) => e.key === 'Enter' && saveEdit()}
                         />
-                        <p className="text-sm text-muted-foreground">{device.type}</p>
+                        <p className="text-sm text-muted-foreground">{product.product_type_name}</p>
                       </div>
                     ) : (
                       <div>
-                        <h3 className="font-medium truncate">{device.name}</h3>
-                        <p className="text-sm text-muted-foreground">{device.type}</p>
+                        <h3 className="font-medium truncate">{product.name}</h3>
+                        <p className="text-sm text-muted-foreground">{product.product_type_name}</p>
                       </div>
                     )}
                     
-                    <div className="flex items-center gap-2 mt-2">
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
                       <Badge 
-                        variant={device.status === 'online' ? 'default' : 'secondary'}
+                        variant={product.status === 'online' ? 'default' : 'secondary'}
                         className="text-xs"
                       >
-                        {device.status === 'online' ? '🟢' : '🔴'} {device.status.toUpperCase()}
+                        {product.status === 'online' ? '🟢' : '🔴'} {product.status.toUpperCase()}
                       </Badge>
                       <span className="text-xs text-muted-foreground">
-                        ID: {device.id}
+                        ID: {product.serial_number}
                       </span>
                       <span className="text-xs text-muted-foreground">
-                        Connected: {device.connectedAt.toLocaleDateString()}
+                        Installed: {new Date(product.installed_at).toLocaleDateString()}
                       </span>
+                      {product.location_lat && product.location_long && (
+                        <span className="text-xs text-muted-foreground">
+                          📍 {product.location_lat.toFixed(4)}, {product.location_long.toFixed(4)}
+                        </span>
+                      )}
                     </div>
                   </div>
 
                   {/* Action Buttons */}
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    {editingDevice === device.id ? (
+                    {editingProduct === product.id ? (
                       <>
                         <Button
                           size="sm"
@@ -292,7 +423,7 @@ const ThingsPage: React.FC = () => {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => startEdit(device)}
+                          onClick={() => startEdit(product)}
                           className="h-8 w-8 p-0"
                         >
                           <Edit2 className="h-4 w-4" />
@@ -300,7 +431,7 @@ const ThingsPage: React.FC = () => {
                         <Button
                           size="sm"
                           variant="destructive"
-                          onClick={() => handleDeleteDevice(device.id)}
+                          onClick={() => handleDeleteProduct(product.id)}
                           className="h-8 w-8 p-0"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -322,7 +453,7 @@ const ThingsPage: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Total Devices</p>
-                <p className="text-2xl font-bold">{devices.length}</p>
+                <p className="text-2xl font-bold">{products.length}</p>
               </div>
               <Network className="h-8 w-8 text-muted-foreground" />
             </div>
@@ -334,12 +465,10 @@ const ThingsPage: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Online</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {devices.filter(d => d.status === 'online').length}
-                </p>
+                <p className="text-2xl font-bold text-green-600">{onlineDevices}</p>
               </div>
               <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
-                <div className="h-4 w-4 rounded-full bg-green-500"></div>
+                <div className="h-3 w-3 rounded-full bg-green-600"></div>
               </div>
             </div>
           </CardContent>
@@ -350,24 +479,15 @@ const ThingsPage: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Offline</p>
-                <p className="text-2xl font-bold text-red-600">
-                  {devices.filter(d => d.status === 'offline').length}
-                </p>
+                <p className="text-2xl font-bold text-red-600">{offlineDevices}</p>
               </div>
               <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
-                <div className="h-4 w-4 rounded-full bg-red-500"></div>
+                <div className="h-3 w-3 rounded-full bg-red-600"></div>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
-
-      {/* QR Scanner Modal */}
-      <QRScannerModal
-        isOpen={isQRModalOpen}
-        onClose={closeQRScanner}
-        onScan={handleQRScanResult}
-      />
     </div>
   );
 };
