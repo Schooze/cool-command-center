@@ -1,4 +1,4 @@
-// src/pages/ThingsPage.tsx - Updated with backend integration
+// src/pages/ThingsPage.tsx - MINIMAL UPDATE: Hanya tambah InfluxDB error handling
 import React, { useState, useEffect } from 'react';
 import { Network, Edit2, Trash2, Plus, Package, Check, X, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,7 +41,7 @@ const ThingsPage: React.FC = () => {
   const [editName, setEditName] = useState('');
 
   // API Base URL - adjust sesuai environment
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8001';
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
   // Get auth token from localStorage
   const getAuthToken = () => {
@@ -80,7 +80,15 @@ const ThingsPage: React.FC = () => {
       }
 
       const data = await response.json();
-      setProducts(data);
+      console.log('Fetched products:', data); // Debug log
+      
+      // Remove duplicates based on ID
+      const uniqueProducts = data.filter((product: Product, index: number, self: Product[]) => 
+        index === self.findIndex(p => p.id === product.id)
+      );
+      
+      console.log('Unique products:', uniqueProducts); // Debug log
+      setProducts(uniqueProducts);
     } catch (error) {
       console.error('Error fetching products:', error);
       toast({
@@ -117,16 +125,56 @@ const ThingsPage: React.FC = () => {
         body: JSON.stringify(requestBody),
       });
 
-      const data: DeviceRegistrationResponse = await response.json();
-
       if (!response.ok) {
-        toast({
-          title: "Error",
-          description: data.message || "Failed to register device",
-          variant: "destructive"
-        });
+        const errorData = await response.json();
+        console.log('Registration error:', errorData); // Debug log
+        
+        // Handle structured error responses
+        if (errorData.detail && typeof errorData.detail === 'object') {
+          const { type, message, suggestion } = errorData.detail;
+          
+          // Customize toast based on error type
+          let title = "Error";
+          let variant: "destructive" | "default" = "destructive";
+          
+          if (type === "DEVICE_ALREADY_REGISTERED") {
+            title = "Device Already Registered";
+            variant = "default"; // Less alarming for already registered
+          } else if (type === "UNKNOWN_DEVICE_PREFIX") {
+            title = "Invalid Device Format";
+          } else if (type === "INFLUXDB_VALIDATION_FAILED") {
+            title = "Device Not Found in InfluxDB";
+            variant = "destructive";
+          } else if (type === "PRODUCT_TYPE_NOT_FOUND") {
+            title = "System Configuration Error";
+          }
+          
+          toast({
+            title: title,
+            description: (
+              <div className="space-y-2">
+                <p>{message}</p>
+                {suggestion && (
+                  <p className="text-sm opacity-80">
+                    💡 {suggestion}
+                  </p>
+                )}
+              </div>
+            ),
+            variant: variant
+          });
+        } else {
+          // Fallback for simple error messages
+          toast({
+            title: "Registration Failed",
+            description: errorData.detail || errorData.message || "Failed to register device",
+            variant: "destructive"
+          });
+        }
         return;
       }
+
+      const data: DeviceRegistrationResponse = await response.json();
 
       if (data.success) {
         toast({
@@ -141,8 +189,8 @@ const ThingsPage: React.FC = () => {
     } catch (error) {
       console.error('Error registering device:', error);
       toast({
-        title: "Error",
-        description: "Network error. Please check your connection.",
+        title: "Network Error",
+        description: "Please check your internet connection and try again.",
         variant: "destructive"
       });
     } finally {
@@ -209,22 +257,38 @@ const ThingsPage: React.FC = () => {
     }
 
     try {
+      console.log('Deleting product:', productId); // Debug log
+      
       const response = await fetch(`${API_BASE_URL}/api/devices/products/${productId}`, {
         method: 'DELETE',
         headers: getHeaders(),
       });
 
-      const data = await response.json();
-
+      console.log('Delete response status:', response.status); // Debug log
+      
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Delete error response:', errorText); // Debug log
+        
+        // Try to parse as JSON, fallback to text
+        let errorMessage;
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.detail || errorData.message || 'Failed to delete device';
+        } catch {
+          errorMessage = errorText || 'Failed to delete device';
+        }
+        
         toast({
           title: "Error",
-          description: data.detail || "Failed to delete device",
+          description: errorMessage,
           variant: "destructive"
         });
         return;
       }
 
+      const data = await response.json();
+      
       if (data.success) {
         toast({
           title: "Success",
@@ -314,13 +378,22 @@ const ThingsPage: React.FC = () => {
                 className="px-6"
                 disabled={submitting}
               >
-                {submitting ? 'Submitting...' : 'Submit'}
+                {submitting ? (
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Validating...
+                  </div>
+                ) : (
+                  'Submit'
+                )}
               </Button>
             </div>
             <p className="text-sm text-muted-foreground">
               * Device ID format: F0101 + MAC Address (e.g., F0101ABC123DEF456)
               <br />
-              * Prefix F0101 will be registered as Commercial Freezer
+              * Device harus sudah mengirim data ke InfluxDB untuk bisa didaftarkan
+              <br />
+              * Prefix F0101 akan didaftarkan sebagai Commercial Freezer
             </p>
           </div>
         </CardContent>
@@ -348,9 +421,9 @@ const ThingsPage: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              {products.map((product) => (
+              {products.map((product, index) => (
                 <div 
-                  key={product.id}
+                  key={`product-${product.id}-${index}`} // More unique key
                   className="flex items-center gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                 >
                   {/* Device Image */}
