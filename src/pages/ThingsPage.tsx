@@ -41,7 +41,7 @@ const ThingsPage: React.FC = () => {
   const [editName, setEditName] = useState('');
 
   // API Base URL - adjust sesuai environment
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://192.168.100.30:8001';
 
   // Get auth token from localStorage
   const getAuthToken = () => {
