@@ -1,4 +1,4 @@
-// src/pages/ThingsPage.tsx - MINIMAL UPDATE: Hanya tambah InfluxDB error handling
+// src/pages/ThingsPage.tsx - TAMPILAN ASLI + DeviceService yang Fixed
 import React, { useState, useEffect } from 'react';
 import { Network, Edit2, Trash2, Plus, Package, Check, X, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { deviceService } from '@/services/deviceService';
 
 // Type definitions based on backend schema
 interface Product {
@@ -40,46 +41,12 @@ const ThingsPage: React.FC = () => {
   const [editingProduct, setEditingProduct] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
 
-  // API Base URL - adjust sesuai environment
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://192.168.100.30:8001';
-
-  // Get auth token from localStorage
-  const getAuthToken = () => {
-    return localStorage.getItem('access_token');
-  };
-
-  // API Headers with authentication
-  const getHeaders = () => {
-    const token = getAuthToken();
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': token ? `Bearer ${token}` : '',
-    };
-  };
-
-  // Fetch products from backend
+  // Fetch products from backend using deviceService (FIXED)
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/devices/products`, {
-        method: 'GET',
-        headers: getHeaders(),
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          toast({
-            title: "Error",
-            description: "Session expired. Please login again.",
-            variant: "destructive"
-          });
-          // Redirect to login or handle auth error
-          return;
-        }
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await deviceService.getProducts();
+      
       console.log('Fetched products:', data); // Debug log
       
       // Remove duplicates based on ID
@@ -89,11 +56,22 @@ const ThingsPage: React.FC = () => {
       
       console.log('Unique products:', uniqueProducts); // Debug log
       setProducts(uniqueProducts);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching products:', error);
+      
+      let errorMessage = "Failed to load devices. Please try again.";
+      
+      if (error.name === 'DeviceNetworkError') {
+        errorMessage = "Cannot connect to device service. Check backend connection.";
+      } else if (error.name === 'DeviceEndpointNotFound') {
+        errorMessage = "Device API endpoint not found. Check backend configuration.";
+      } else if (error.response?.status === 401) {
+        errorMessage = "Session expired. Please login again.";
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to load devices. Please try again.",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -101,7 +79,7 @@ const ThingsPage: React.FC = () => {
     }
   };
 
-  // Register new device
+  // Register new device using deviceService (FIXED)
   const handleAddDevice = async () => {
     if (!newDeviceId.trim()) {
       toast({
@@ -115,66 +93,7 @@ const ThingsPage: React.FC = () => {
     try {
       setSubmitting(true);
       
-      const requestBody: DeviceRegistrationRequest = {
-        device_id: newDeviceId.trim()
-      };
-
-      const response = await fetch(`${API_BASE_URL}/api/devices/register`, {
-        method: 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.log('Registration error:', errorData); // Debug log
-        
-        // Handle structured error responses
-        if (errorData.detail && typeof errorData.detail === 'object') {
-          const { type, message, suggestion } = errorData.detail;
-          
-          // Customize toast based on error type
-          let title = "Error";
-          let variant: "destructive" | "default" = "destructive";
-          
-          if (type === "DEVICE_ALREADY_REGISTERED") {
-            title = "Device Already Registered";
-            variant = "default"; // Less alarming for already registered
-          } else if (type === "UNKNOWN_DEVICE_PREFIX") {
-            title = "Invalid Device Format";
-          } else if (type === "INFLUXDB_VALIDATION_FAILED") {
-            title = "Device Not Found in InfluxDB";
-            variant = "destructive";
-          } else if (type === "PRODUCT_TYPE_NOT_FOUND") {
-            title = "System Configuration Error";
-          }
-          
-          toast({
-            title: title,
-            description: (
-              <div className="space-y-2">
-                <p>{message}</p>
-                {suggestion && (
-                  <p className="text-sm opacity-80">
-                    💡 {suggestion}
-                  </p>
-                )}
-              </div>
-            ),
-            variant: variant
-          });
-        } else {
-          // Fallback for simple error messages
-          toast({
-            title: "Registration Failed",
-            description: errorData.detail || errorData.message || "Failed to register device",
-            variant: "destructive"
-          });
-        }
-        return;
-      }
-
-      const data: DeviceRegistrationResponse = await response.json();
+      const data: DeviceRegistrationResponse = await deviceService.registerDevice(newDeviceId.trim());
 
       if (data.success) {
         toast({
@@ -186,19 +105,62 @@ const ThingsPage: React.FC = () => {
         // Refresh products list
         await fetchProducts();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error registering device:', error);
-      toast({
-        title: "Network Error",
-        description: "Please check your internet connection and try again.",
-        variant: "destructive"
-      });
+      
+      // Handle structured error responses
+      if (error.response?.data?.detail && typeof error.response.data.detail === 'object') {
+        const { type, message, suggestion } = error.response.data.detail;
+        
+        // Customize toast based on error type
+        let title = "Error";
+        let variant: "destructive" | "default" = "destructive";
+        
+        if (type === "DEVICE_ALREADY_REGISTERED") {
+          title = "Device Already Registered";
+          variant = "default"; // Less alarming for already registered
+        } else if (type === "UNKNOWN_DEVICE_PREFIX") {
+          title = "Invalid Device Format";
+        } else if (type === "INFLUXDB_VALIDATION_FAILED") {
+          title = "Device Not Found in InfluxDB";
+          variant = "destructive";
+        } else if (type === "PRODUCT_TYPE_NOT_FOUND") {
+          title = "System Configuration Error";
+        }
+        
+        toast({
+          title: title,
+          description: (
+            <div className="space-y-2">
+              <p>{message}</p>
+              {suggestion && (
+                <p className="text-sm opacity-80">
+                  💡 {suggestion}
+                </p>
+              )}
+            </div>
+          ),
+          variant: variant
+        });
+      } else {
+        // Fallback for simple error messages
+        const errorMessage = error.response?.data?.detail || 
+                           error.response?.data?.message || 
+                           error.message || 
+                           "Failed to register device";
+        
+        toast({
+          title: "Registration Failed",
+          description: errorMessage,
+          variant: "destructive"
+        });
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Update product name
+  // Update product name using deviceService (FIXED)
   const saveEdit = async () => {
     if (!editName.trim()) {
       toast({
@@ -209,25 +171,10 @@ const ThingsPage: React.FC = () => {
       return;
     }
 
+    if (!editingProduct) return;
+
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/devices/products/${editingProduct}/name?new_name=${encodeURIComponent(editName.trim())}`, 
-        {
-          method: 'PUT',
-          headers: getHeaders(),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        toast({
-          title: "Error",
-          description: data.detail || "Failed to update device name",
-          variant: "destructive"
-        });
-        return;
-      }
+      const data = await deviceService.updateProductName(editingProduct, editName.trim());
 
       if (data.success) {
         toast({
@@ -240,17 +187,23 @@ const ThingsPage: React.FC = () => {
         // Refresh products list
         await fetchProducts();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating product name:', error);
+      
+      const errorMessage = error.response?.data?.detail || 
+                         error.response?.data?.message || 
+                         error.message || 
+                         "Network error. Please try again.";
+      
       toast({
         title: "Error",
-        description: "Network error. Please try again.",
+        description: errorMessage,
         variant: "destructive"
       });
     }
   };
 
-  // Delete product
+  // Delete product using deviceService (FIXED)
   const handleDeleteProduct = async (productId: string) => {
     if (!confirm('Are you sure you want to delete this device?')) {
       return;
@@ -259,35 +212,7 @@ const ThingsPage: React.FC = () => {
     try {
       console.log('Deleting product:', productId); // Debug log
       
-      const response = await fetch(`${API_BASE_URL}/api/devices/products/${productId}`, {
-        method: 'DELETE',
-        headers: getHeaders(),
-      });
-
-      console.log('Delete response status:', response.status); // Debug log
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Delete error response:', errorText); // Debug log
-        
-        // Try to parse as JSON, fallback to text
-        let errorMessage;
-        try {
-          const errorData = JSON.parse(errorText);
-          errorMessage = errorData.detail || errorData.message || 'Failed to delete device';
-        } catch {
-          errorMessage = errorText || 'Failed to delete device';
-        }
-        
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const data = await response.json();
+      const data = await deviceService.deleteProduct(productId);
       
       if (data.success) {
         toast({
@@ -298,11 +223,17 @@ const ThingsPage: React.FC = () => {
         // Refresh products list
         await fetchProducts();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting product:', error);
+      
+      const errorMessage = error.response?.data?.detail || 
+                         error.response?.data?.message || 
+                         error.message || 
+                         "Network error. Please try again.";
+      
       toast({
         title: "Error",
-        description: "Network error. Please try again.",
+        description: errorMessage,
         variant: "destructive"
       });
     }
@@ -337,7 +268,7 @@ const ThingsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header - TAMPILAN ASLI */}
       <div className="flex items-center gap-3">
         <Network className="h-6 w-6 text-primary" />
         <h1 className="text-2xl font-bold">Things</h1>
@@ -354,7 +285,7 @@ const ThingsPage: React.FC = () => {
         </Button>
       </div>
 
-      {/* Add Device Section */}
+      {/* Add Device Section - TAMPILAN ASLI */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -399,7 +330,7 @@ const ThingsPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Devices List */}
+      {/* Devices List - TAMPILAN ASLI */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -426,12 +357,12 @@ const ThingsPage: React.FC = () => {
                   key={`product-${product.id}-${index}`} // More unique key
                   className="flex items-center gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                 >
-                  {/* Device Image */}
+                  {/* Device Image - TAMPILAN ASLI */}
                   <div className="w-20 h-20 bg-muted rounded-lg flex items-center justify-center flex-shrink-0">
                     <Package className="h-8 w-8 text-muted-foreground" />
                   </div>
 
-                  {/* Device Info */}
+                  {/* Device Info - TAMPILAN ASLI */}
                   <div className="flex-1 min-w-0">
                     {editingProduct === product.id ? (
                       <div className="space-y-2">
@@ -471,7 +402,7 @@ const ThingsPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Action Buttons */}
+                  {/* Action Buttons - TAMPILAN ASLI */}
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {editingProduct === product.id ? (
                       <>
@@ -519,7 +450,7 @@ const ThingsPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Statistics */}
+      {/* Statistics - TAMPILAN ASLI */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-6">
@@ -566,3 +497,6 @@ const ThingsPage: React.FC = () => {
 };
 
 export default ThingsPage;
+
+// Export deviceService untuk komponen lain
+export { deviceService };
