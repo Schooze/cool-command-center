@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 1234,
     allowedHosts: [
-      "https://ecooling.reinutechiot.com"
+      "ecooling.reinutechiot.com"
     ]
   },
   plugins: [
