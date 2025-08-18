@@ -3,16 +3,8 @@
 import axios from 'axios';
 import Cookies from 'js-cookie';
 
-// 🎯 SOLUSI: Consistent API Base URL (sama dengan authService)
-const API_BASE_URL = (() => {
-  // Development environment - gunakan local backend
-  if (import.meta.env.DEV || window.location.hostname === '192.168.100.253') {
-    return 'http://192.168.100.30:8001';
-  }
-  
-  // Production environment - gunakan Cloudflare tunnel jika tersedia
-  return import.meta.env.VITE_API_URL || 'http://192.168.100.30:8001';
-})();
+const API_BASE_URL = 'https://ecoolapi.reinutechiot.com';
+
 
 console.log('🔧 Device Service API Base URL:', API_BASE_URL);
 

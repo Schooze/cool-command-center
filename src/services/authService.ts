@@ -4,16 +4,7 @@ import axios from 'axios';
 import Cookies from 'js-cookie';
 import { LoginResponse, User, IPStatus } from '@/types/auth.types';
 
-// 🎯 SOLUSI: Fix API Base URL - Prioritas Local Backend
-const API_BASE_URL = (() => {
-  // Development environment - gunakan local backend
-  if (import.meta.env.DEV || window.location.hostname === '192.168.100.253') {
-    return 'http://192.168.100.30:8001';
-  }
-  
-  // Production environment - gunakan Cloudflare tunnel jika tersedia
-  return import.meta.env.VITE_API_URL || 'http://192.168.100.30:8001';
-})();
+const API_BASE_URL = 'https://ecoolapi.reinutechiot.com';
 
 console.log('🔧 API Base URL:', API_BASE_URL);
 console.log('🔧 Environment:', import.meta.env.DEV ? 'Development' : 'Production');
