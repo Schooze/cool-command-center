@@ -1,8 +1,8 @@
-// File: src/services/authService.ts (Fixed URL Configuration)
+// src/services/authService.ts - Enhanced dengan debugging
 
 import axios from 'axios';
 import Cookies from 'js-cookie';
-import { LoginResponse, User, IPStatus } from '@/types/auth.types';
+import { User, LoginResponse, IPStatus } from '@/types/auth.types';
 
 const API_BASE_URL = 'https://ecoolapi.reinutechiot.com';
 
@@ -10,28 +10,20 @@ console.log('🔧 API Base URL:', API_BASE_URL);
 console.log('🔧 Environment:', import.meta.env.DEV ? 'Development' : 'Production');
 console.log('🔧 Current hostname:', window.location.hostname);
 
+// Create axios instance
 const authAPI = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000, // Increased timeout
-  withCredentials: true, // Enable credentials for CORS
+  timeout: 15000,
+  withCredentials: true,
 });
 
-// ============= ENHANCED REQUEST INTERCEPTOR =============
+// Request interceptor
 authAPI.interceptors.request.use((config) => {
   const token = Cookies.get('auth_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   
-  // Enhanced headers for debugging
-  config.headers['X-Client-App'] = 'Koronka-IoT-Dashboard';
-  config.headers['X-Client-Version'] = '1.0.0';
-  config.headers['X-Request-ID'] = Date.now().toString();
-  
-  const browserInfo = getBrowserInfo();
-  config.headers['X-Browser-Info'] = browserInfo;
-  
-  // Debug log
   console.log(`🚀 ${config.method?.toUpperCase()} ${config.url}`, {
     baseURL: config.baseURL,
     headers: config.headers,
@@ -41,166 +33,56 @@ authAPI.interceptors.request.use((config) => {
   return config;
 });
 
-function getBrowserInfo(): string {
-  const ua = navigator.userAgent;
-  const platform = navigator.platform;
-  const language = navigator.language;
-  
-  let browser = 'Unknown';
-  let version = 'Unknown';
-  
-  if (ua.includes('Chrome') && !ua.includes('Edge')) {
-    browser = 'Chrome';
-    version = ua.match(/Chrome\/([0-9.]+)/)?.[1] || 'Unknown';
-  } else if (ua.includes('Firefox')) {
-    browser = 'Firefox';
-    version = ua.match(/Firefox\/([0-9.]+)/)?.[1] || 'Unknown';
-  } else if (ua.includes('Safari') && !ua.includes('Chrome')) {
-    browser = 'Safari';
-    version = ua.match(/Safari\/([0-9.]+)/)?.[1] || 'Unknown';
-  } else if (ua.includes('Edge')) {
-    browser = 'Edge';
-    version = ua.match(/Edge\/([0-9.]+)/)?.[1] || 'Unknown';
-  }
-  
-  let deviceType = 'Desktop';
-  if (/Mobile|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua)) {
-    deviceType = 'Mobile';
-  } else if (/Tablet|iPad/i.test(ua)) {
-    deviceType = 'Tablet';
-  }
-  
-  return `${browser}/${version} (${platform}) ${deviceType} Lang:${language}`;
-}
-
-// ============= ENHANCED RESPONSE INTERCEPTOR =============
+// Enhanced Response interceptor dengan debugging
 authAPI.interceptors.response.use(
   (response) => {
     console.log('✅ Response received:', response.status, response.config.url);
+    
+    // 🐛 DEBUG: Log response data untuk endpoint yang penting
+    if (response.config.url?.includes('/auth/login') || response.config.url?.includes('/auth/me')) {
+      console.log('🔍 AUTH RESPONSE DEBUG:');
+      console.log('- URL:', response.config.url);
+      console.log('- Status:', response.status);
+      console.log('- Headers:', response.headers);
+      console.log('- Raw Data:', response.data);
+      console.log('- Data Type:', typeof response.data);
+      console.log('- Data Keys:', Object.keys(response.data || {}));
+      
+      if (response.data?.user) {
+        console.log('🔍 USER OBJECT DEBUG:');
+        console.log('- User:', response.data.user);
+        console.log('- User Keys:', Object.keys(response.data.user || {}));
+        console.log('- Account Type:', response.data.user.account_type);
+        console.log('- Account Type Type:', typeof response.data.user.account_type);
+        console.log('- Account Type Length:', response.data.user.account_type?.length);
+      }
+    }
+    
     return response;
   },
   (error) => {
-    const errorDetails = {
+    console.error('❌ API Error:', {
       status: error.response?.status,
       url: error.config?.url,
       method: error.config?.method?.toUpperCase(),
       message: error.message,
       code: error.code,
-      baseURL: error.config?.baseURL
-    };
-    
-    console.error('❌ API Error:', errorDetails);
-    
-    // Enhanced error handling for different scenarios
-    if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
-      console.log('🚨 CORS/Network Error detected!');
-      console.log('🔍 Troubleshooting:');
-      console.log('    1. Check if backend is running');
-      console.log('    2. Check Cloudflare tunnel status');
-      console.log('    3. Verify origin in CORS settings');
-      console.log('    4. Try switching to local IP instead of tunnel');
-      
-      // Enhance error message
-      const enhancedError = new Error(
-        'Tidak dapat terhubung ke server. Pastikan backend berjalan dan CORS dikonfigurasi dengan benar.'
-      );
-      enhancedError.name = 'NetworkError';
-      return Promise.reject(enhancedError);
-    }
-    
-    if (error.response?.status === 404) {
-      console.log('🚨 404 Error - Endpoint not found!');
-      console.log('🔍 Current API Base URL:', error.config?.baseURL);
-      console.log('🔍 Full URL:', `${error.config?.baseURL}${error.config?.url}`);
-      
-      const enhancedError = new Error(
-        `Endpoint tidak ditemukan: ${error.config?.url}. Periksa konfigurasi server.`
-      );
-      enhancedError.name = 'EndpointNotFound';
-      return Promise.reject(enhancedError);
-    }
-    
-    if (error.response?.status === 401) {
-      const currentPath = window.location.pathname;
-      
-      // Only redirect if NOT already on login page
-      if (currentPath !== '/login' && currentPath !== '/') {
-        console.log('🔄 Unauthorized - redirecting to login');
-        Cookies.remove('auth_token');
-        window.location.href = '/login';
-      } else {
-        console.log('🔄 Login failed - removing invalid token');
-        Cookies.remove('auth_token');
-      }
-    }
+      responseData: error.response?.data
+    });
     
     return Promise.reject(error);
   }
 );
 
-// ============= HEALTH CHECK FUNCTION =============
-const healthCheck = async (): Promise<boolean> => {
-  try {
-    console.log('🏥 Performing health check...');
-    const response = await axios.get(`${API_BASE_URL}/health`, { 
-      timeout: 5000,
-      withCredentials: true 
-    });
-    console.log('✅ Health check passed:', response.status);
-    return true;
-  } catch (error) {
-    console.log('❌ Health check failed:', error);
-    return false;
-  }
-};
-
-// ============= CORS DEBUG FUNCTION =============
-const corsDebug = async (): Promise<void> => {
-  try {
-    console.log('🔍 Performing CORS debug...');
-    const response = await axios.get(`${API_BASE_URL}/cors-debug`, {
-      timeout: 5000,
-      withCredentials: true,
-      headers: {
-        'Origin': window.location.origin
-      }
-    });
-    console.log('✅ CORS debug successful:', response.data);
-  } catch (error) {
-    console.log('❌ CORS debug failed:', error);
-  }
-};
-
-// ============= AUTH SERVICE =============
 export const authService = {
-  // Test connection and CORS
-  async testConnection(): Promise<{ health: boolean; cors: boolean }> {
-    const health = await healthCheck();
-    
-    let cors = false;
-    try {
-      await corsDebug();
-      cors = true;
-    } catch (error) {
-      cors = false;
-    }
-    
-    return { health, cors };
-  },
-
+  // Enhanced login method dengan debugging lengkap
   async login(username: string, password: string): Promise<LoginResponse> {
-    console.log('🔐 Attempting login...');
+    console.log('🔐 Attempting login for:', username);
     
-    // Pre-login connection test
+    // Test connection first
     const connectionTest = await this.testConnection();
-    console.log('🔍 Connection test result:', connectionTest);
-    
     if (!connectionTest.health) {
-      throw new Error('Backend server tidak dapat dijangkau. Periksa koneksi server.');
-    }
-    
-    if (!connectionTest.cors) {
-      console.warn('⚠️ CORS test failed, but attempting login anyway...');
+      throw new Error('Server tidak dapat dijangkau. Periksa koneksi server.');
     }
     
     const formData = new FormData();
@@ -209,12 +91,105 @@ export const authService = {
     
     try {
       const response = await authAPI.post('/auth/login', formData);
+      
       console.log('✅ Login successful!');
-      return response.data;
+      console.log('🔍 FULL RESPONSE ANALYSIS:');
+      console.log('- Response object:', response);
+      console.log('- Response.data:', JSON.stringify(response.data, null, 2));
+      
+      // Validate response structure
+      if (!response.data) {
+        console.error('❌ No response data received');
+        throw new Error('Invalid response: No data received');
+      }
+      
+      if (!response.data.access_token) {
+        console.error('❌ No access_token in response');
+        console.log('Available keys:', Object.keys(response.data));
+        throw new Error('Invalid response: Missing access_token');
+      }
+      
+      if (!response.data.user) {
+        console.error('❌ No user object in response');
+        console.log('Available keys:', Object.keys(response.data));
+        throw new Error('Invalid response: Missing user object');
+      }
+      
+      // Validate user object
+      const user = response.data.user;
+      console.log('🔍 USER VALIDATION:');
+      console.log('- User object:', user);
+      console.log('- Has id:', !!user.id);
+      console.log('- Has username:', !!user.username);
+      console.log('- Has account_type:', !!user.account_type);
+      console.log('- account_type value:', user.account_type);
+      console.log('- account_type type:', typeof user.account_type);
+      
+      if (!user.account_type) {
+        console.error('❌ Missing account_type in user object');
+        console.log('User keys:', Object.keys(user));
+        
+        // Try to recover by setting default or throw error
+        console.warn('⚠️ Setting default account_type to "client" due to missing field');
+        user.account_type = 'client';
+      }
+      
+      // Normalize account_type
+      const normalizedAccountType = user.account_type.toString().toLowerCase().trim();
+      console.log('🔧 Normalized account_type:', normalizedAccountType);
+      
+      // Validate account_type value
+      if (!['admin', 'teknisi', 'client'].includes(normalizedAccountType)) {
+        console.error('❌ Invalid account_type value:', user.account_type);
+        console.warn('⚠️ Setting account_type to "client" due to invalid value');
+        user.account_type = 'client';
+      } else {
+        user.account_type = normalizedAccountType;
+      }
+      
+      console.log('🎯 FINAL USER OBJECT:', user);
+      
+      return response.data as LoginResponse;
+      
     } catch (error: any) {
       console.error('❌ Login failed:', error);
-      throw error;
+      
+      if (error.response?.data?.detail) {
+        throw new Error(error.response.data.detail);
+      }
+      
+      throw new Error(error.message || 'Login failed');
     }
+  },
+
+  // Enhanced getCurrentUser dengan debugging
+  async getCurrentUser(): Promise<User> {
+    console.log('🔍 Fetching current user...');
+    
+    const response = await authAPI.get('/auth/me');
+    
+    console.log('🔍 GET CURRENT USER RESPONSE:');
+    console.log('- Data:', JSON.stringify(response.data, null, 2));
+    
+    const user = response.data;
+    
+    // Validate and normalize account_type
+    if (!user.account_type) {
+      console.error('❌ Missing account_type in getCurrentUser response');
+      user.account_type = 'client'; // default fallback
+    }
+    
+    const normalizedAccountType = user.account_type.toString().toLowerCase().trim();
+    if (!['admin', 'teknisi', 'client'].includes(normalizedAccountType)) {
+      console.error('❌ Invalid account_type in getCurrentUser:', user.account_type);
+      user.account_type = 'client'; // default fallback
+    } else {
+      user.account_type = normalizedAccountType;
+    }
+    
+    console.log('🎯 FINAL CURRENT USER:', user);
+    
+    return user;
   },
 
   async checkIPStatus(): Promise<IPStatus> {
@@ -223,17 +198,39 @@ export const authService = {
     return response.data;
   },
 
-  async getCurrentUser(): Promise<User> {
-    const response = await authAPI.get('/auth/me');
-    return response.data;
-  },
-
   async logout(): Promise<void> {
     console.log('🚪 Logging out...');
     await authAPI.post('/auth/logout');
   },
 
+  // Connection test method
+  async testConnection(): Promise<{ health: boolean; cors: boolean }> {
+    try {
+      console.log('🏥 Performing health check...');
+      const healthResponse = await authAPI.get('/health');
+      console.log('✅ Health check passed:', healthResponse.status);
+      
+      // Test CORS
+      try {
+        console.log('🔍 Performing CORS debug...');
+        await authAPI.get('/cors-debug', {
+          headers: { 'Origin': window.location.origin }
+        });
+        console.log('✅ CORS test passed');
+        return { health: true, cors: true };
+      } catch (corsError) {
+        console.log('❌ CORS debug failed:', corsError);
+        return { health: true, cors: false };
+      }
+      
+    } catch (error) {
+      console.error('❌ Health check failed:', error);
+      return { health: false, cors: false };
+    }
+  },
+
   setToken(token: string): void {
+    console.log('🔐 Setting auth token');
     Cookies.set('auth_token', token, {
       expires: 7,
       secure: false, // Set to true in production with HTTPS
@@ -246,10 +243,10 @@ export const authService = {
   },
 
   removeToken(): void {
+    console.log('🗑️ Removing auth token');
     Cookies.remove('auth_token');
   },
 
-  // Get current API configuration
   getConfig(): { baseURL: string; environment: string } {
     return {
       baseURL: API_BASE_URL,
