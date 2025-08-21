@@ -1,4 +1,4 @@
-export default AuthenticatedHeader;// src/components/AuthenticatedHeader.tsx - Updated with Role Display
+// src/components/AuthenticatedHeader.tsx - Updated with Role Display (FIXED)
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -105,46 +105,34 @@ const AuthenticatedHeader: React.FC<AuthenticatedHeaderProps> = ({ className }) 
   const roleInfo = user ? getRoleInfo(user.account_type) : null;
 
   return (
-    <header className={`sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 ${className || ''}`}>
-      <div className="flex h-16 items-center justify-between px-4">
-        {/* Left Section - Sidebar Toggle & Logo */}
-        <div className="flex items-center">
-          {/* Sidebar Toggle Button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="mr-4 h-9 w-9"
-            onClick={toggleSidebar}
-          >
-            <PanelLeft className="h-4 w-4" />
-            <span className="sr-only">Toggle sidebar</span>
-          </Button>
+    <header className={`flex h-16 items-center border-b bg-background px-4 lg:h-[60px] lg:px-6 ${className || ''}`}>
+      <div className="flex items-center w-full">
+        {/* Sidebar Toggle */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden"
+          onClick={toggleSidebar}
+        >
+          <PanelLeft className="h-5 w-5" />
+          <span className="sr-only">Toggle sidebar</span>
+        </Button>
 
-          {/* Logo */}
-          <div className="flex items-center">
-            <img
-              src="/koronka_text_clear.png"
-              alt="Koronka Logo"
-              className="h-8 w-auto"
-            />
-          </div>
+        {/* Logo and Title - Visible on larger screens */}
+        <div className="hidden md:flex items-center gap-2 font-semibold">
+          <Snowflake className="h-6 w-6 text-blue-600" />
+          <span className="text-lg">Koronka IoT</span>
         </div>
 
-        {/* Right Section - Role Badge & User Info */}
-        <div className="flex items-center space-x-4">
-          {/* Role Badge */}
-          {user && roleInfo && (
-            <Badge variant={roleInfo.variant} className="flex items-center gap-2">
-              <roleInfo.icon className="h-4 w-4" />
-              {roleInfo.label}
-            </Badge>
-          )}
+        {/* Spacer */}
+        <div className="flex-1" />
 
-          {/* User Menu */}
+        {/* User Menu */}
+        <div className="flex items-center gap-4">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-10 w-auto px-2">
-                <div className="flex items-center space-x-2">
+              <Button variant="ghost" className="relative h-10 w-auto px-2 md:px-4">
+                <div className="flex items-center gap-2">
                   <Avatar className="h-8 w-8">
                     <AvatarFallback className="bg-blue-100 text-blue-600 text-sm font-medium">
                       {user ? getUserInitials(user.username) : 'U'}
@@ -217,3 +205,6 @@ const AuthenticatedHeader: React.FC<AuthenticatedHeaderProps> = ({ className }) 
     </header>
   );
 };
+
+// Export harus di akhir setelah component didefinisikan
+export default AuthenticatedHeader;
