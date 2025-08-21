@@ -123,7 +123,7 @@ const AuthenticatedHeader: React.FC<AuthenticatedHeaderProps> = ({ className }) 
           <img
             src="/koronka_logo_text.png" // ganti dengan path logo kamu
             alt="Koronka IoT Logo"
-            className="h-6 w-6"
+            className="h-auto max-h-10"
           />
         </div>
 
