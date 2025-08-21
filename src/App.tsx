@@ -1,8 +1,10 @@
-// src/App.tsx - Complete Fixed Version with proper routing
+// src/App.tsx - Fixed dengan Import yang Benar berdasarkan struktur project
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
 
 // Auth Components
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -12,16 +14,27 @@ import RoleBasedRedirect from '@/components/RoleBasedRedirect';
 // Layout Components
 import MainLayout from '@/components/MainLayout';
 
-// Page Components
+// Page Components - MENGGUNAKAN YANG ADA DI PROJECT
 import LoginPage from '@/pages/LoginPage';
-import Dashboard from '@/pages/Dashboard';
-import MaintenancePage from '@/pages/MaintenancePage';
+import Index from '@/pages/Index'; // Contains Dashboard component
+import ConfigPage from '@/pages/ConfigPage';
 import ThingsPage from '@/pages/ThingsPage';
-import AuditDataLogging from '@/pages/AuditDataLogging';
-import Config from '@/pages/Config';
+import MaintenancePage from '@/pages/MaintenancePage';
 import TeknisiPage from '@/pages/TeknisiPage';
 import ClientPage from '@/pages/ClientPage';
-import UnauthorizedPage from '@/pages/UnauthorizedPage';
+
+// Component imports (yang ada di components/)
+import AuditDataLogging from '@/components/AuditDataLogging';
+
+// Unauthorized Page Component (buat inline karena tidak ada file terpisah)
+const UnauthorizedPage: React.FC = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <div className="text-center">
+      <h1 className="text-2xl font-bold text-red-600">Akses Ditolak</h1>
+      <p className="text-gray-600 mt-2">Anda tidak memiliki akses ke halaman ini.</p>
+    </div>
+  </div>
+);
 
 // Create a client
 const queryClient = new QueryClient({
@@ -39,6 +52,8 @@ const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
+        <Toaster />
+        <Sonner />
         <BrowserRouter>
           <AuthProvider>
             <Routes>
@@ -53,9 +68,7 @@ const App: React.FC = () => {
                 path="/dashboard" 
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
-                    <MainLayout>
-                      <Dashboard />
-                    </MainLayout>
+                    <Index />
                   </ProtectedRoute>
                 } 
               />
@@ -98,7 +111,7 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <MainLayout>
-                      <Config />
+                      <ConfigPage />
                     </MainLayout>
                   </ProtectedRoute>
                 } 
