@@ -1,4 +1,4 @@
-// src/components/ProtectedRoute.tsx
+// src/components/auth/ProtectedRoute.tsx - Updated with Role Support
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -11,7 +11,7 @@ interface ProtectedRouteProps {
   redirectTo?: string;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
+export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
   allowedRoles,
   redirectTo = '/login' 
@@ -39,7 +39,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   // Check role permissions if specified
   if (allowedRoles && allowedRoles.length > 0) {
     if (!allowedRoles.includes(user.account_type)) {
-      // Redirect based on user role
+      // Redirect based on user role to their appropriate home page
       switch (user.account_type) {
         case 'admin':
           return <Navigate to="/dashboard" replace />;
@@ -56,5 +56,3 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   // User is authenticated and has required permissions
   return <>{children}</>;
 };
-
-export default ProtectedRoute;
