@@ -1,11 +1,10 @@
-// File: src/types/auth.types.ts - Updated with account_type
-
+// src/types/auth.types.ts - Complete Type Definitions
 export type AccountType = 'admin' | 'teknisi' | 'client';
 
 export interface User {
   id: string;
   username: string;
-  account_type: AccountType;  // NEW FIELD
+  account_type: AccountType;
   created_at: string;
 }
 
@@ -31,7 +30,7 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   ipStatus: IPStatus | null;
   checkIPStatus: () => Promise<void>;
-  // NEW: Helper methods for role checking
+  // Helper methods for role checking
   isAdmin: () => boolean;
   isTeknisi: () => boolean;
   isClient: () => boolean;

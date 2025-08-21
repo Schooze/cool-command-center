@@ -1,11 +1,13 @@
-// src/components/RoleBasedRedirect.tsx - Enhanced dengan debugging
-// ===================================
-
+// src/components/RoleBasedRedirect.tsx - Complete Fixed Version
 import React, { useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 
+/**
+ * Component that redirects users to appropriate page based on their role
+ * Used for root path "/" and after login
+ */
 const RoleBasedRedirect: React.FC = () => {
   const { user, loading, isAuthenticated } = useAuth();
 

@@ -1,9 +1,7 @@
-// src/components/ProtectedRoute.tsx - Enhanced dengan debugging
-// ===================================
-
+// src/components/ProtectedRoute.tsx - Complete Fixed Version
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { AccountType } from '@/types/auth.types';
 import { Loader2 } from 'lucide-react';
 
@@ -35,6 +33,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // Show loading spinner while checking authentication
   if (loading) {
+    console.log('🔄 ProtectedRoute: Showing loading state for path:', location.pathname);
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="flex flex-col items-center space-y-4">
@@ -47,7 +46,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // Redirect to login if not authenticated
   if (!isAuthenticated || !user) {
-    console.log('🚫 ProtectedRoute: User not authenticated');
+    console.log('🚫 ProtectedRoute: User not authenticated, redirecting to login');
     return <Navigate to={redirectTo} state={{ from: location }} replace />;
   }
 
@@ -57,6 +56,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     const normalizedAllowedRoles = allowedRoles.map(role => role.toLowerCase().trim());
     
     console.log('🔒 ProtectedRoute permission check:');
+    console.log('- Path:', location.pathname);
     console.log('- User account type:', userAccountType);
     console.log('- Allowed roles:', normalizedAllowedRoles);
     console.log('- Has access:', normalizedAllowedRoles.includes(userAccountType));
@@ -67,21 +67,21 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       // Redirect based on user role to their appropriate home page
       switch (userAccountType) {
         case 'admin':
-          console.log('📍 Redirecting admin to /dashboard');
+          console.log('📍 ProtectedRoute: Redirecting admin to /dashboard');
           return <Navigate to="/dashboard" replace />;
         case 'teknisi':
-          console.log('📍 Redirecting teknisi to /teknisi');
+          console.log('📍 ProtectedRoute: Redirecting teknisi to /teknisi');
           return <Navigate to="/teknisi" replace />;
         case 'client':
-          console.log('📍 Redirecting client to /client');
+          console.log('📍 ProtectedRoute: Redirecting client to /client');
           return <Navigate to="/client" replace />;
         default:
-          console.log('📍 Redirecting unknown role to /unauthorized');
+          console.log('📍 ProtectedRoute: Redirecting unknown role to /unauthorized');
           return <Navigate to="/unauthorized" replace />;
       }
     }
   }
 
-  console.log('✅ ProtectedRoute: Access granted');
+  console.log('✅ ProtectedRoute: Access granted for path:', location.pathname);
   return <>{children}</>;
 };

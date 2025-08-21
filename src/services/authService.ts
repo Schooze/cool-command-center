@@ -1,5 +1,4 @@
-// src/services/authService.ts - Enhanced dengan debugging
-
+// src/services/authService.ts - Complete Fixed Version
 import axios from 'axios';
 import Cookies from 'js-cookie';
 import { User, LoginResponse, IPStatus } from '@/types/auth.types';
