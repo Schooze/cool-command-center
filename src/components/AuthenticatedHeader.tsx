@@ -118,10 +118,13 @@ const AuthenticatedHeader: React.FC<AuthenticatedHeaderProps> = ({ className }) 
           <span className="sr-only">Toggle sidebar</span>
         </Button>
 
-        {/* Logo and Title - Visible on larger screens */}
-        <div className="hidden md:flex items-center gap-2 font-semibold">
-          <Snowflake className="h-6 w-6 text-blue-600" />
-          <span className="text-lg">Koronka IoT</span>
+        {/* Logo - Visible on larger screens */}
+        <div className="hidden md:flex items-center">
+          <img
+            src="/koronka_logo_text.png" // ganti dengan path logo kamu
+            alt="Koronka IoT Logo"
+            className="h-6 w-6"
+          />
         </div>
 
         {/* Spacer */}
