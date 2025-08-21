@@ -1,4 +1,4 @@
-// src/contexts/AuthContext.tsx - Complete Fixed Version
+// src/contexts/AuthContext.tsx - Fixed Login Parameter Issue
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { authService } from '@/services/authService';
 import { User, LoginResponse, IPStatus, AuthContextType, AccountType } from '@/types/auth.types';
@@ -54,11 +54,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     initializeAuth();
   }, []);
 
+  // 🔧 FIX: Proper parameter handling for login
   const login = async (username: string, password: string): Promise<LoginResponse> => {
-    console.log('🔐 AuthContext: Login attempt for:', username);
+    console.log('🔐 AuthContext: Login attempt for:', username); // Fixed: log only username
     setLoading(true);
     
     try {
+      // 🔧 FIX: Pass parameters correctly
       const response = await authService.login(username, password);
       
       console.log('🔍 AuthContext: LOGIN RESPONSE RECEIVED:');

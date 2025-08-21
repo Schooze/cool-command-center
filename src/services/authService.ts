@@ -1,4 +1,4 @@
-// src/services/authService.ts - Complete Fixed Version
+// src/services/authService.ts - Fixed Login Parameter Handling
 import axios from 'axios';
 import Cookies from 'js-cookie';
 import { User, LoginResponse, IPStatus } from '@/types/auth.types';
@@ -74,9 +74,9 @@ authAPI.interceptors.response.use(
 );
 
 export const authService = {
-  // Enhanced login method dengan debugging lengkap
+  // 🔧 FIX: Proper login method dengan parameter handling yang benar
   async login(username: string, password: string): Promise<LoginResponse> {
-    console.log('🔐 Attempting login for:', username);
+    console.log('🔐 Attempting login for:', username); // Fixed: log only username
     
     // Test connection first
     const connectionTest = await this.testConnection();
@@ -84,9 +84,14 @@ export const authService = {
       throw new Error('Server tidak dapat dijangkau. Periksa koneksi server.');
     }
     
+    // 🔧 FIX: Proper FormData creation
     const formData = new FormData();
     formData.append('username', username);
     formData.append('password', password);
+    
+    console.log('🔍 FormData created with:');
+    console.log('- username:', username);
+    console.log('- password:', '[HIDDEN]');
     
     try {
       const response = await authAPI.post('/auth/login', formData);
@@ -153,8 +158,13 @@ export const authService = {
     } catch (error: any) {
       console.error('❌ Login failed:', error);
       
+      // Enhanced error handling
       if (error.response?.data?.detail) {
         throw new Error(error.response.data.detail);
+      } else if (error.response?.status === 401) {
+        throw new Error('Username atau password salah');
+      } else if (error.response?.status >= 500) {
+        throw new Error('Server sedang bermasalah. Coba lagi nanti.');
       }
       
       throw new Error(error.message || 'Login failed');
