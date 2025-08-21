@@ -1,6 +1,4 @@
-// src/pages/TeknisiPage.tsx
-import React, { useState } from 'react';
-import MainLayout from '@/components/MainLayout';
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,29 +9,55 @@ import { Separator } from '@/components/ui/separator';
 import { 
   Wrench, 
   Clock, 
-  AlertTriangle, 
   CheckCircle, 
   FileText, 
-  Camera,
   Save,
-  Send 
+  User,
+  Calendar,
+  PenTool,
+  LogOut
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 const TeknisiPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [currentDateTime] = useState(new Date().toISOString().slice(0, 16));
+  const [ownerDateTime] = useState(new Date().toISOString().slice(0, 16));
+  
   const [formData, setFormData] = useState({
-    deviceId: '',
-    issueType: '',
-    description: '',
-    repairActions: '',
-    partsUsed: '',
-    timeSpent: '',
-    nextMaintenance: '',
-    notes: ''
+    workUnderWarranty: '',
+    visitOutcome: '',
+    workPerformed: '',
+    maintenanceWorkerName: user?.username || '',
+    visitDateTime: currentDateTime,
+    remarks: '',
+    ownerSignature: '',
+    ownerName: '',
+    ownerDateTime: ownerDateTime
   });
 
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+
+  // Initialize canvas for signature
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Set canvas size
+    canvas.width = canvas.offsetWidth;
+    canvas.height = 200;
+    
+    // Set drawing styles
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+  }, []);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -42,95 +66,134 @@ const TeknisiPage: React.FC = () => {
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Signature drawing functions
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    setIsDrawing(true);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  };
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    setIsDrawing(false);
+  };
+
+  const clearSignature = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  };
+
+  const handleSubmit = async () => {
     setSubmitStatus('loading');
+    
+    // Get signature data
+    const canvas = canvasRef.current;
+    const signatureData = canvas ? canvas.toDataURL() : '';
+    
+    const finalFormData = {
+      ...formData,
+      ownerSignature: signatureData
+    };
     
     // Mock API call
     setTimeout(() => {
-      console.log('Form submitted:', formData);
+      console.log('Form submitted:', finalFormData);
       setSubmitStatus('success');
+      
       // Reset form after successful submission
       setTimeout(() => {
         setFormData({
-          deviceId: '',
-          issueType: '',
-          description: '',
-          repairActions: '',
-          partsUsed: '',
-          timeSpent: '',
-          nextMaintenance: '',
-          notes: ''
+          workUnderWarranty: '',
+          visitOutcome: '',
+          workPerformed: '',
+          maintenanceWorkerName: user?.username || '',
+          visitDateTime: new Date().toISOString().slice(0, 16),
+          remarks: '',
+          ownerSignature: '',
+          ownerName: '',
+          ownerDateTime: new Date().toISOString().slice(0, 16)
         });
+        clearSignature();
         setSubmitStatus('idle');
       }, 2000);
     }, 1500);
   };
 
+  const handleLogout = () => {
+    logout();
+  };
+
   return (
-    <MainLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Panel Teknisi</h1>
-            <p className="text-muted-foreground">
-              Selamat datang, {user?.username}! Kelola maintenance dan perbaikan peralatan.
-            </p>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header without sidebar */}
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <Wrench className="h-8 w-8 text-blue-600" />
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">Koronka IoT Dashboard</h1>
+                  <p className="text-sm text-gray-500">Panel Teknisi</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-4">
+              <Badge variant="secondary" className="flex items-center gap-2">
+                <User className="h-4 w-4" />
+                {user?.username}
+              </Badge>
+              <Button variant="outline" size="sm" onClick={handleLogout}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
+            </div>
           </div>
-          <Badge variant="secondary" className="flex items-center gap-2">
-            <Wrench className="h-4 w-4" />
-            Teknisi
-          </Badge>
         </div>
+      </header>
 
-        <Separator />
-
-        {/* Quick Stats */}
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Task Hari Ini</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">8</div>
-              <p className="text-xs text-muted-foreground">+2 dari kemarin</p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Urgent Repairs</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-red-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">3</div>
-              <p className="text-xs text-muted-foreground">Perlu prioritas</p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Completed</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">12</div>
-              <p className="text-xs text-muted-foreground">Minggu ini</p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Avg. Time</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">2.5h</div>
-              <p className="text-xs text-muted-foreground">Per task</p>
-            </CardContent>
-          </Card>
+      {/* Main Content */}
+      <main className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        {/* Welcome Section */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            Selamat datang, {user?.username}!
+          </h2>
+          <p className="text-gray-600">
+            Lengkapi laporan maintenance dan perbaikan peralatan pendingin daging.
+          </p>
         </div>
 
         {/* Maintenance Report Form */}
@@ -138,145 +201,194 @@ const TeknisiPage: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Laporan Maintenance & Perbaikan
+              Maintenance Report Form
             </CardTitle>
+            <p className="text-sm text-gray-600">
+              Silakan lengkapi formulir laporan kunjungan maintenance
+            </p>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="deviceId">ID Perangkat</Label>
+            <div className="space-y-6">
+              {/* Work Under Warranty */}
+              <div className="space-y-2">
+                <Label htmlFor="workUnderWarranty">Work under warranty</Label>
+                <select
+                  id="workUnderWarranty"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                  value={formData.workUnderWarranty}
+                  onChange={(e) => handleInputChange('workUnderWarranty', e.target.value)}
+                  required
+                >
+                  <option value="">Select option</option>
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                </select>
+              </div>
+
+              {/* Outcome of the visit */}
+              <div className="space-y-2">
+                <Label htmlFor="visitOutcome">Outcome of the visit</Label>
+                <select
+                  id="visitOutcome"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                  value={formData.visitOutcome}
+                  onChange={(e) => handleInputChange('visitOutcome', e.target.value)}
+                  required
+                >
+                  <option value="">Select outcome</option>
+                  <option value="issued_closed">Issued closed</option>
+                  <option value="inspected_will_return">Inspected and will come back for repairs</option>
+                </select>
+              </div>
+
+              {/* Work performed or comments */}
+              <div className="space-y-2">
+                <Label htmlFor="workPerformed">Work performed or comments from the visit</Label>
+                <Textarea
+                  id="workPerformed"
+                  placeholder="Describe the work performed or comments about the visit..."
+                  value={formData.workPerformed}
+                  onChange={(e) => handleInputChange('workPerformed', e.target.value)}
+                  required
+                  rows={4}
+                />
+              </div>
+
+              {/* Maintenance worker name (auto-filled) */}
+              <div className="space-y-2">
+                <Label htmlFor="maintenanceWorkerName">Name of the maintenance worker</Label>
+                <div className="relative">
                   <Input
-                    id="deviceId"
-                    placeholder="Contoh: FREEZER-001"
-                    value={formData.deviceId}
-                    onChange={(e) => handleInputChange('deviceId', e.target.value)}
-                    required
+                    id="maintenanceWorkerName"
+                    value={formData.maintenanceWorkerName}
+                    onChange={(e) => handleInputChange('maintenanceWorkerName', e.target.value)}
+                    className="bg-gray-50"
+                    readOnly
                   />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="issueType">Jenis Masalah</Label>
-                  <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                    value={formData.issueType}
-                    onChange={(e) => handleInputChange('issueType', e.target.value)}
-                    required
-                  >
-                    <option value="">Pilih jenis masalah</option>
-                    <option value="maintenance">Maintenance Rutin</option>
-                    <option value="repair">Perbaikan</option>
-                    <option value="emergency">Emergency Repair</option>
-                    <option value="inspection">Inspeksi</option>
-                  </select>
+                  <User className="absolute right-3 top-2.5 h-4 w-4 text-gray-400" />
                 </div>
               </div>
 
+              {/* Date and time (auto-filled) */}
               <div className="space-y-2">
-                <Label htmlFor="description">Deskripsi Masalah</Label>
+                <Label htmlFor="visitDateTime">Date and Time</Label>
+                <div className="relative">
+                  <Input
+                    id="visitDateTime"
+                    type="datetime-local"
+                    value={formData.visitDateTime}
+                    onChange={(e) => handleInputChange('visitDateTime', e.target.value)}
+                    className="bg-gray-50"
+                    readOnly
+                  />
+                  <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-gray-400" />
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Remarks */}
+              <div className="space-y-2">
+                <Label htmlFor="remarks">Remarks</Label>
+                <p className="text-sm text-gray-500 italic">
+                  To be completed by the Owner or Resident
+                </p>
                 <Textarea
-                  id="description"
-                  placeholder="Jelaskan kondisi perangkat dan masalah yang ditemukan..."
-                  value={formData.description}
-                  onChange={(e) => handleInputChange('description', e.target.value)}
-                  required
+                  id="remarks"
+                  placeholder="Remarks from owner or resident..."
+                  value={formData.remarks}
+                  onChange={(e) => handleInputChange('remarks', e.target.value)}
                   rows={3}
                 />
               </div>
 
+              {/* Signature of owner/resident */}
               <div className="space-y-2">
-                <Label htmlFor="repairActions">Tindakan Perbaikan</Label>
-                <Textarea
-                  id="repairActions"
-                  placeholder="Jelaskan langkah-langkah perbaikan yang dilakukan..."
-                  value={formData.repairActions}
-                  onChange={(e) => handleInputChange('repairActions', e.target.value)}
-                  required
-                  rows={3}
+                <Label>Signature of the owner or resident</Label>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                  <canvas
+                    ref={canvasRef}
+                    className="w-full h-48 border border-gray-200 rounded cursor-crosshair bg-white"
+                    onMouseDown={startDrawing}
+                    onMouseMove={draw}
+                    onMouseUp={stopDrawing}
+                    onMouseLeave={stopDrawing}
+                  />
+                  <div className="flex justify-between items-center mt-2">
+                    <p className="text-sm text-gray-500 flex items-center gap-1">
+                      <PenTool className="h-4 w-4" />
+                      Draw signature above
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={clearSignature}
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Name of owner/resident */}
+              <div className="space-y-2">
+                <Label htmlFor="ownerName">Name of the owner or resident</Label>
+                <Input
+                  id="ownerName"
+                  placeholder="Enter owner or resident name"
+                  value={formData.ownerName}
+                  onChange={(e) => handleInputChange('ownerName', e.target.value)}
                 />
               </div>
 
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="space-y-2">
-                  <Label htmlFor="partsUsed">Spare Parts Digunakan</Label>
-                  <Input
-                    id="partsUsed"
-                    placeholder="Contoh: Kompressor, Filter, dll"
-                    value={formData.partsUsed}
-                    onChange={(e) => handleInputChange('partsUsed', e.target.value)}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="timeSpent">Waktu Pengerjaan (jam)</Label>
-                  <Input
-                    id="timeSpent"
-                    type="number"
-                    step="0.5"
-                    placeholder="2.5"
-                    value={formData.timeSpent}
-                    onChange={(e) => handleInputChange('timeSpent', e.target.value)}
-                    required
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="nextMaintenance">Next Maintenance</Label>
-                  <Input
-                    id="nextMaintenance"
-                    type="date"
-                    value={formData.nextMaintenance}
-                    onChange={(e) => handleInputChange('nextMaintenance', e.target.value)}
-                  />
-                </div>
-              </div>
-
+              {/* Date and time for owner (auto-filled) */}
               <div className="space-y-2">
-                <Label htmlFor="notes">Catatan Tambahan</Label>
-                <Textarea
-                  id="notes"
-                  placeholder="Catatan untuk maintenance selanjutnya, rekomendasi, dll..."
-                  value={formData.notes}
-                  onChange={(e) => handleInputChange('notes', e.target.value)}
-                  rows={2}
-                />
+                <Label htmlFor="ownerDateTime">Date and Time</Label>
+                <div className="relative">
+                  <Input
+                    id="ownerDateTime"
+                    type="datetime-local"
+                    value={formData.ownerDateTime}
+                    onChange={(e) => handleInputChange('ownerDateTime', e.target.value)}
+                    className="bg-gray-50"
+                    readOnly
+                  />
+                  <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-gray-400" />
+                </div>
               </div>
 
-              {/* Submit Buttons */}
-              <div className="flex gap-4 pt-4">
+              {/* Submit Button */}
+              <div className="pt-6">
                 <Button 
-                  type="submit" 
+                  type="button" 
                   disabled={submitStatus === 'loading'}
-                  className="flex-1"
+                  className="w-full h-12 text-lg"
+                  onClick={handleSubmit}
                 >
                   {submitStatus === 'loading' ? (
                     <>
-                      <Clock className="h-4 w-4 mr-2 animate-spin" />
-                      Menyimpan...
+                      <Clock className="h-5 w-5 mr-2 animate-spin" />
+                      Submitting Report...
                     </>
                   ) : submitStatus === 'success' ? (
                     <>
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Berhasil Disimpan!
+                      <CheckCircle className="h-5 w-5 mr-2" />
+                      Report Submitted Successfully!
                     </>
                   ) : (
                     <>
-                      <Save className="h-4 w-4 mr-2" />
-                      Simpan Laporan
+                      <Save className="h-5 w-5 mr-2" />
+                      Submit Maintenance Report
                     </>
                   )}
                 </Button>
-                
-                <Button type="button" variant="outline">
-                  <Camera className="h-4 w-4 mr-2" />
-                  Upload Foto
-                </Button>
               </div>
-            </form>
+            </div>
           </CardContent>
         </Card>
-      </div>
-    </MainLayout>
+      </main>
+    </div>
   );
 };
 
