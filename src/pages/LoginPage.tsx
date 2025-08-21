@@ -65,8 +65,9 @@ const LoginPage: React.FC = () => {
       setIsSubmitting(true);
       console.log('🔐 Login attempt for:', username);
       
-      await login({ username: username.trim(), password });
-      
+      // await login({ username: username.trim(), password });
+      await login(username.trim(), password);
+            
       console.log('✅ Login successful');
       
     } catch (error: any) {
