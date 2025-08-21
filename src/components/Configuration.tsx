@@ -1,4 +1,4 @@
-// File: src/components/Configuration.tsx - TAMPILAN ASLI + DeviceService yang Fixed
+// File: src/components/Configuration.tsx - Updated with API integration
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,11 +11,13 @@ import { Progress } from '@/components/ui/progress';
 import { Settings, Snowflake, RotateCcw, Save, Clock, Thermometer, Timer, Package, Network } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Area, ComposedChart } from 'recharts';
 import { deviceService } from '@/services/deviceService';
+import { configService } from '@/services/configService';
 
 // Toast hook
 const useToast = () => ({
   toast: ({ title, description, variant }: { title: string; description: string; variant?: string }) => {
-    console.log(`Toast: ${title} - ${description}`);
+    console.log(`Toast: ${title} - ${description} - Variant: ${variant || 'default'}`);
+    // You can integrate with your actual toast system here
   }
 });
 
@@ -29,13 +31,6 @@ interface BackendProduct {
   installed_at: string;
   location_lat?: number;
   location_long?: number;
-}
-
-interface ConfigSaveRequest {
-  device_id: string;
-  parameters: {
-    [key: string]: number;
-  };
 }
 
 // CycleGraph component (unchanged)
@@ -220,10 +215,11 @@ interface ConnectedDevice {
 const Configuration = () => {
   const { toast } = useToast();
   
-  // Backend integration state (FIXED - using deviceService)
+  // Backend integration state (FIXED - using deviceService + configService)
   const [connectedDevices, setConnectedDevices] = useState<ConnectedDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadingConfig, setLoadingConfig] = useState(false);
 
   // Original state
   const [autoModeEnabled, setAutoModeEnabled] = useState(true);
@@ -322,33 +318,55 @@ const Configuration = () => {
     }
   };
 
-  // Save configuration to InfluxDB (simulate for now)
+  // Save configuration to InfluxDB using configService (UPDATED)
   const saveConfigurationToInfluxDB = async (deviceSerialNumber: string, configData: { [key: string]: number }) => {
     try {
-      // TODO: Implement real API call when backend config endpoints are ready
-      // For now, just simulate the save
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return { success: true, message: 'Configuration saved successfully' };
+      console.log('Saving configuration to InfluxDB:', { deviceSerialNumber, configData });
+      
+      // Validate parameters before saving
+      if (!configService.validateParameters(configData)) {
+        throw new Error('Invalid configuration parameters. Only F01-F12 parameters are allowed.');
+      }
+      
+      // Save using configService
+      const result = await configService.saveConfiguration(deviceSerialNumber, configData);
+      
+      return { 
+        success: true, 
+        message: result.message,
+        device_id: result.device_id,
+        timestamp: result.timestamp
+      };
+      
     } catch (error) {
       console.error('Error saving to InfluxDB:', error);
       throw error;
     }
   };
 
-  // Load configuration from InfluxDB (simulate for now)
+  // Load configuration from InfluxDB using configService (UPDATED)
   const loadConfigurationFromInfluxDB = async (deviceSerialNumber: string) => {
     try {
-      // TODO: Implement real API call when backend config endpoints are ready
-      // For now, just return null (use defaults)
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return null;
+      console.log('Loading configuration from InfluxDB for device:', deviceSerialNumber);
+      
+      // Load using configService
+      const configData = await configService.loadConfiguration(deviceSerialNumber);
+      
+      if (configData) {
+        console.log('Loaded configuration:', configData);
+        return configData;
+      } else {
+        console.log('No configuration found for device:', deviceSerialNumber);
+        return null;
+      }
+      
     } catch (error) {
       console.error('Error loading from InfluxDB:', error);
-      return null;
+      return null; // Return null to use defaults
     }
   };
 
-  // Save configuration with backend integration
+  // Save configuration with backend integration (UPDATED)
   const saveConfiguration = async () => {
     if (!selectedDevice) {
       toast({
@@ -362,25 +380,37 @@ const Configuration = () => {
     try {
       setSaving(true);
       
-      // Prepare configuration data (F01-F12 parameters)
-      const configData: { [key: string]: number } = {};
-      parameters.forEach(param => {
-        configData[param.code.toLowerCase()] = param.value;
-      });
+      // Convert frontend parameters to backend format using configService
+      const configData = configService.convertToBackendFormat(parameters);
+
+      console.log('Saving configuration for device:', selectedDevice.serialNumber);
+      console.log('Configuration data:', configData);
 
       // Save to InfluxDB via backend
-      await saveConfigurationToInfluxDB(selectedDevice.serialNumber, configData);
+      const result = await saveConfigurationToInfluxDB(selectedDevice.serialNumber, configData);
 
       toast({
         title: "Configuration Saved",
-        description: `Configuration saved to InfluxDB for ${selectedDevice.name}.`,
+        description: `Configuration saved to InfluxDB for ${selectedDevice.name} at ${result.timestamp ? new Date(result.timestamp).toLocaleString() : 'now'}.`,
       });
       
     } catch (error) {
       console.error('Save configuration error:', error);
+      
+      let errorMessage = "Failed to save configuration. Please try again.";
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        
+        // Handle specific error types
+        if (error.name === 'ConfigNetworkError') {
+          errorMessage = "Cannot connect to configuration service. Please check if the backend is running.";
+        }
+      }
+      
       toast({
         title: "Error",
-        description: `Failed to save configuration: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -388,38 +418,67 @@ const Configuration = () => {
     }
   };
 
-  // Reset to defaults with save option
+  // Reset to defaults with save option (UPDATED)
   const resetToDefaults = async () => {
     setParameters([...defaultParameters]);
     
     toast({
       title: "Reset to Defaults",
-      description: "All parameters have been reset to factory defaults. Click Save to apply to device.",
+      description: "All parameters have been reset to factory defaults. Click 'Save Configuration' to apply changes to InfluxDB.",
     });
   };
 
-  // Load device configuration when device changes
+  // Load device configuration when device changes (UPDATED)
   const loadDeviceConfiguration = async (deviceSerialNumber: string) => {
     try {
+      setLoadingConfig(true);
+      
       const configData = await loadConfigurationFromInfluxDB(deviceSerialNumber);
       
       if (configData) {
-        // Update parameters with data from InfluxDB
-        setParameters(prev => prev.map(param => ({
-          ...param,
-          value: configData[param.code.toLowerCase()] ?? param.value
-        })));
+        // Convert backend data to frontend format using configService
+        const updatedParameters = configService.convertToFrontendFormat(configData, defaultParameters);
+        setParameters(updatedParameters);
         
-        console.log('Configuration loaded from InfluxDB for device:', deviceSerialNumber);
+        toast({
+          title: "Configuration Loaded",
+          description: `Configuration loaded from InfluxDB for device ${deviceSerialNumber}.`,
+        });
       } else {
         // Use default parameters if no config found
         setParameters([...defaultParameters]);
+        
+        toast({
+          title: "Using Defaults",
+          description: `No saved configuration found for device ${deviceSerialNumber}. Using default values.`,
+          variant: "default"
+        });
       }
     } catch (error) {
       console.error('Error loading device configuration:', error);
       // Fallback to defaults on error
       setParameters([...defaultParameters]);
+      
+      toast({
+        title: "Error Loading Config",
+        description: "Failed to load configuration from InfluxDB. Using default values.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingConfig(false);
     }
+  };
+
+  // Refresh configuration from InfluxDB (NEW)
+  const refreshConfiguration = async () => {
+    if (!selectedDevice) return;
+    
+    await loadDeviceConfiguration(selectedDevice.serialNumber);
+    
+    toast({
+      title: "Configuration Refreshed",
+      description: `Latest configuration reloaded for ${selectedDevice.name}.`,
+    });
   };
 
   // Fetch devices on component mount
@@ -427,7 +486,7 @@ const Configuration = () => {
     fetchDevices();
   }, []);
 
-  // Load configuration when device changes
+  // Load configuration when device changes (UPDATED)
   useEffect(() => {
     if (selectedDevice) {
       loadDeviceConfiguration(selectedDevice.serialNumber);
@@ -601,6 +660,12 @@ const Configuration = () => {
                     <div className="text-sm font-medium mt-1">
                       🌡️ {selectedDevice.temperature.toFixed(1)}°C
                     </div>
+                    {loadingConfig && (
+                      <div className="text-xs text-blue-600 mt-2 flex items-center gap-1">
+                        <div className="w-3 h-3 border border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                        Loading config...
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -621,15 +686,36 @@ const Configuration = () => {
                 <p className="text-sm text-muted-foreground mb-3">
                   This will reset all parameters to factory defaults.
                 </p>
-                <Button 
-                  onClick={resetToDefaults} 
-                  variant="outline" 
-                  size="sm"
-                  className="w-full"
-                >
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Reset to Defaults
-                </Button>
+                <div className="space-y-2">
+                  <Button 
+                    onClick={resetToDefaults} 
+                    variant="outline" 
+                    size="sm"
+                    className="w-full"
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Reset to Defaults
+                  </Button>
+                  <Button 
+                    onClick={refreshConfiguration} 
+                    variant="secondary" 
+                    size="sm"
+                    className="w-full"
+                    disabled={!selectedDevice || loadingConfig}
+                  >
+                    {loadingConfig ? (
+                      <>
+                        <div className="w-4 h-4 border border-current border-t-transparent rounded-full animate-spin mr-2"></div>
+                        Refreshing...
+                      </>
+                    ) : (
+                      <>
+                        <Settings className="h-4 w-4 mr-2" />
+                        Refresh Config
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
@@ -646,7 +732,7 @@ const Configuration = () => {
                   Save Configuration
                 </div>
                 <p className="text-sm text-muted-foreground mb-3">
-                  Save current settings for {selectedDevice?.name || 'selected device'}.
+                  Save current settings to InfluxDB for {selectedDevice?.name || 'selected device'}.
                 </p>
                 <Button 
                   onClick={saveConfiguration} 
@@ -662,7 +748,7 @@ const Configuration = () => {
                   ) : (
                     <>
                       <Save className="h-4 w-4 mr-2" />
-                      Save Configuration
+                      Save to InfluxDB
                     </>
                   )}
                 </Button>
@@ -944,6 +1030,12 @@ const Configuration = () => {
             <CardTitle className="flex items-center gap-2">
               <Settings className="h-5 w-5" />
               Standard Parameters (F01-F06)
+              {loadingConfig && (
+                <div className="flex items-center gap-2 text-sm text-blue-600">
+                  <div className="w-4 h-4 border border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  Loading...
+                </div>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -963,6 +1055,7 @@ const Configuration = () => {
                       min={param.min}
                       max={param.max}
                       className="w-24"
+                      disabled={loadingConfig}
                     />
                     <span className="text-sm text-muted-foreground">{param.unit}</span>
                   </div>
@@ -996,6 +1089,7 @@ const Configuration = () => {
                       min={param.min}
                       max={param.max}
                       className="w-24"
+                      disabled={loadingConfig}
                     />
                     <span className="text-sm text-muted-foreground">{param.unit}</span>
                   </div>
@@ -1033,10 +1127,10 @@ const Configuration = () => {
               <div className="p-4 border rounded-lg">
                 <div className="text-sm text-muted-foreground">Last Action</div>
                 <div className="text-lg font-semibold">
-                  {saving ? 'Saving...' : 'Ready'}
+                  {saving ? 'Saving...' : loadingConfig ? 'Loading...' : 'Ready'}
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  Click Save to apply changes
+                  {saving ? 'Saving to InfluxDB' : loadingConfig ? 'Loading from InfluxDB' : 'Click Save to apply changes'}
                 </div>
               </div>
             </div>
@@ -1045,10 +1139,12 @@ const Configuration = () => {
             <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <h5 className="font-medium mb-2 text-blue-800">Configuration Info</h5>
               <div className="text-sm text-blue-700 space-y-1">
-                <p>• Parameters F01-F12 will be saved to InfluxDB with device serial number as filter</p>
-                <p>• Configuration is automatically loaded when switching devices</p>
-                <p>• Reset to Defaults will restore factory settings (save required to apply)</p>
-                <p>• All changes are stored in measurement format: {`{device_serial}_field`}</p>
+                <p>• Parameters F01-F12 are automatically saved to InfluxDB bucket: <code>coolingmonitoring</code></p>
+                <p>• Configuration is auto-loaded when switching devices using device serial number</p>
+                <p>• Data format: <code>config_data,chipid=device_serial f01=value,f02=value,...</code></p>
+                <p>• Reset to Defaults restores factory settings (save required to apply to InfluxDB)</p>
+                <p>• Refresh Config reloads latest configuration from InfluxDB</p>
+                <p>• All changes are validated before saving (F01-F12 parameters only)</p>
               </div>
             </div>
           </CardContent>
