@@ -1,4 +1,4 @@
-// src/components/AuthenticatedHeader.tsx
+export default AuthenticatedHeader;// src/components/AuthenticatedHeader.tsx - Updated with Role Display
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -19,7 +19,9 @@ import {
   Snowflake,
   Clock,
   Shield,
-  Loader2 
+  Loader2,
+  Wrench,
+  UserCheck
 } from 'lucide-react';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
@@ -66,6 +68,42 @@ const AuthenticatedHeader: React.FC<AuthenticatedHeaderProps> = ({ className }) 
     });
   };
 
+  // Get role badge variant and icon
+  const getRoleInfo = (accountType: string) => {
+    switch (accountType) {
+      case 'admin':
+        return {
+          variant: 'default' as const,
+          icon: Shield,
+          label: 'Administrator',
+          color: 'text-blue-600'
+        };
+      case 'teknisi':
+        return {
+          variant: 'secondary' as const,
+          icon: Wrench,
+          label: 'Teknisi',
+          color: 'text-green-600'
+        };
+      case 'client':
+        return {
+          variant: 'outline' as const,
+          icon: UserCheck,
+          label: 'Client',
+          color: 'text-purple-600'
+        };
+      default:
+        return {
+          variant: 'secondary' as const,
+          icon: User,
+          label: 'User',
+          color: 'text-gray-600'
+        };
+    }
+  };
+
+  const roleInfo = user ? getRoleInfo(user.account_type) : null;
+
   return (
     <header className={`sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 ${className || ''}`}>
       <div className="flex h-16 items-center justify-between px-4">
@@ -82,20 +120,7 @@ const AuthenticatedHeader: React.FC<AuthenticatedHeaderProps> = ({ className }) 
             <span className="sr-only">Toggle sidebar</span>
           </Button>
 
-          {/* Logo and System Name */}
-          {/* <div className="flex items-center space-x-3">
-            <div className="flex items-center space-x-2">
-              <Snowflake className="h-6 w-6 text-blue-600" />
-              <div className="hidden sm:block">
-                <h1 className="text-lg font-semibold text-gray-900">
-                  Koronka Control System
-                </h1>
-                <p className="text-xs text-gray-500">
-                  Sistem Monitoring Pendingin Daging
-                </p>
-              </div>
-            </div>
-          </div> */}
+          {/* Logo */}
           <div className="flex items-center">
             <img
               src="/koronka_text_clear.png"
@@ -105,8 +130,16 @@ const AuthenticatedHeader: React.FC<AuthenticatedHeaderProps> = ({ className }) 
           </div>
         </div>
 
-        {/* Right Section - User Info & Actions */}
+        {/* Right Section - Role Badge & User Info */}
         <div className="flex items-center space-x-4">
+          {/* Role Badge */}
+          {user && roleInfo && (
+            <Badge variant={roleInfo.variant} className="flex items-center gap-2">
+              <roleInfo.icon className="h-4 w-4" />
+              {roleInfo.label}
+            </Badge>
+          )}
+
           {/* User Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -117,76 +150,57 @@ const AuthenticatedHeader: React.FC<AuthenticatedHeaderProps> = ({ className }) 
                       {user ? getUserInitials(user.username) : 'U'}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="hidden sm:block text-left">
+                  <div className="hidden md:block text-left">
                     <p className="text-sm font-medium text-gray-900">
-                      {user?.username || 'Unknown User'}
+                      {user?.username || 'User'}
                     </p>
                     <p className="text-xs text-gray-500">
-                      Operator System
+                      {roleInfo?.label || 'Unknown Role'}
                     </p>
                   </div>
                 </div>
               </Button>
             </DropdownMenuTrigger>
             
-            <DropdownMenuContent className="w-64" align="end" forceMount>
-              <DropdownMenuLabel className="font-normal">
-                <div className="flex flex-col space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className="bg-blue-100 text-blue-600">
-                        {user ? getUserInitials(user.username) : 'U'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="text-sm font-medium leading-none">
-                        {user?.username}
-                      </p>
-                      <p className="text-xs leading-none text-muted-foreground mt-1">
-                        Koronka Operator
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {/* User Info Badges */}
-                  <div className="flex flex-wrap gap-1">
-                    <Badge variant="secondary" className="text-xs">
-                      <Shield className="h-3 w-3 mr-1" />
-                      Authenticated
-                    </Badge>
-                    {user?.created_at && (
-                      <Badge variant="outline" className="text-xs">
-                        <Clock className="h-3 w-3 mr-1" />
-                        Since {formatUserDate(user.created_at)}
-                      </Badge>
+            <DropdownMenuContent className="w-64" align="end">
+              <DropdownMenuLabel>
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium">
+                    {user?.username}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    {roleInfo && (
+                      <>
+                        <roleInfo.icon className={`h-4 w-4 ${roleInfo.color}`} />
+                        <p className={`text-xs ${roleInfo.color}`}>
+                          {roleInfo.label}
+                        </p>
+                      </>
                     )}
                   </div>
+                  <p className="text-xs text-gray-500">
+                    Bergabung: {user ? formatUserDate(user.created_at) : '-'}
+                  </p>
                 </div>
               </DropdownMenuLabel>
               
               <DropdownMenuSeparator />
               
-              <DropdownMenuItem 
-                onClick={() => navigate('/profile')}
-                className="cursor-pointer"
-              >
+              <DropdownMenuItem className="cursor-pointer">
                 <User className="mr-2 h-4 w-4" />
-                <span>Profile Settings</span>
+                <span>Profile</span>
               </DropdownMenuItem>
               
-              <DropdownMenuItem 
-                onClick={() => navigate('/config')}
-                className="cursor-pointer"
-              >
+              <DropdownMenuItem className="cursor-pointer">
                 <Settings className="mr-2 h-4 w-4" />
-                <span>System Configuration</span>
+                <span>Settings</span>
               </DropdownMenuItem>
               
               <DropdownMenuSeparator />
               
               <DropdownMenuItem 
+                className="cursor-pointer text-red-600 focus:text-red-600"
                 onClick={handleLogout}
-                className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
                 disabled={isLoggingOut}
               >
                 {isLoggingOut ? (
@@ -203,5 +217,3 @@ const AuthenticatedHeader: React.FC<AuthenticatedHeaderProps> = ({ className }) 
     </header>
   );
 };
-
-export default AuthenticatedHeader;

@@ -1,9 +1,11 @@
+// File: src/types/auth.types.ts - Updated with account_type
 
-// File: src/types/auth.types.ts (Enhanced)
+export type AccountType = 'admin' | 'teknisi' | 'client';
 
 export interface User {
   id: string;
   username: string;
+  account_type: AccountType;  // NEW FIELD
   created_at: string;
 }
 
@@ -13,7 +15,6 @@ export interface LoginResponse {
   user: User;
 }
 
-// 🆕 NEW: IP Status interface
 export interface IPStatus {
   is_blocked: boolean;
   remaining_time: number;
@@ -30,4 +31,8 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   ipStatus: IPStatus | null;
   checkIPStatus: () => Promise<void>;
+  // NEW: Helper methods for role checking
+  isAdmin: () => boolean;
+  isTeknisi: () => boolean;
+  isClient: () => boolean;
 }
